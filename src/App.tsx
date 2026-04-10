@@ -46,7 +46,7 @@ L.Marker.prototype.options.icon = DefaultIcon;
 // --- CONFIGURATION ---
 // Replace this with your actual Supabase Storage Public URL
 // Format: https://[PROJECT_ID].supabase.co/storage/v1/object/public/[BUCKET_NAME]
-const STORAGE_BASE_URL = "https://your-project-id.supabase.co/storage/v1/object/public/flat-assets";
+const STORAGE_BASE_URL = "https://eulxcwxefaaamjsfblqx.supabase.co/storage/v1/object/public/flat-assets";
 
 const AMENITIES = [
   { icon: <Wifi className="w-5 h-5" />, label: "High-speed Wi-Fi" },
@@ -70,6 +70,7 @@ export default function App() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
+  const [landscapeImages, setLandscapeImages] = useState<typeof HERO_IMAGES>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Form state
@@ -84,11 +85,50 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentHeroIndex((prev) => (prev + 1) % HERO_IMAGES.length);
-    }, 3500); // 3.5 seconds: quick but readable
-    return () => clearInterval(timer);
+    const validateImages = async () => {
+      const results = await Promise.all(
+        HERO_IMAGES.map((img) => {
+          return new Promise<typeof HERO_IMAGES[0] | null>((resolve) => {
+            const image = new Image();
+            image.src = img.src;
+            image.onload = () => {
+              // Only accept landscape or square images
+              if (image.naturalWidth >= image.naturalHeight) {
+                resolve(img);
+              } else {
+                resolve(null);
+              }
+            };
+            image.onerror = () => {
+              // If main image fails, check fallback
+              const fallbackImage = new Image();
+              fallbackImage.src = img.fallback;
+              fallbackImage.onload = () => {
+                if (fallbackImage.naturalWidth >= fallbackImage.naturalHeight) {
+                  resolve(img);
+                } else {
+                  resolve(null);
+                }
+              };
+              fallbackImage.onerror = () => resolve(null);
+            };
+          });
+        })
+      );
+      const filtered = results.filter((img): img is typeof HERO_IMAGES[0] => img !== null);
+      setLandscapeImages(filtered.length > 0 ? filtered : HERO_IMAGES.slice(0, 5)); // Fallback to first 5 if none pass
+    };
+
+    validateImages();
   }, []);
+
+  useEffect(() => {
+    if (landscapeImages.length === 0) return;
+    const timer = setInterval(() => {
+      setCurrentHeroIndex((prev) => (prev + 1) % landscapeImages.length);
+    }, 3500);
+    return () => clearInterval(timer);
+  }, [landscapeImages.length]);
 
   const handleVideoPlay = () => {
     if (videoRef.current) {
@@ -179,30 +219,32 @@ export default function App() {
       </AnimatePresence>
 
       {/* Hero Section */}
-      <section className="relative h-screen flex items-center justify-center overflow-hidden">
+      <section className="relative h-screen flex items-center justify-center overflow-hidden bg-brand-black">
         <AnimatePresence mode="wait">
-          <motion.div 
-            key={currentHeroIndex}
-            initial={{ scale: 1.1, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ opacity: 0, scale: 1.05 }}
-            transition={{ duration: 1.5, ease: "easeOut" }}
-            className="absolute inset-0"
-          >
-            <img 
-              src={HERO_IMAGES[currentHeroIndex].src} 
-              onError={(e) => (e.currentTarget.src = HERO_IMAGES[currentHeroIndex].fallback)}
-              alt={`Hero Flat ${currentHeroIndex + 1}`} 
-              className="w-full h-full object-cover"
-              referrerPolicy="no-referrer"
-            />
-            <div className="absolute inset-0 bg-brand-black/20" />
-          </motion.div>
+          {landscapeImages.length > 0 && (
+            <motion.div 
+              key={currentHeroIndex}
+              initial={{ scale: 1.1, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ opacity: 0, scale: 1.05 }}
+              transition={{ duration: 1.5, ease: "easeOut" }}
+              className="absolute inset-0"
+            >
+              <img 
+                src={landscapeImages[currentHeroIndex].src} 
+                onError={(e) => (e.currentTarget.src = landscapeImages[currentHeroIndex].fallback)}
+                alt={`Hero Flat ${currentHeroIndex + 1}`} 
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+              <div className="absolute inset-0 bg-brand-black/20" />
+            </motion.div>
+          )}
         </AnimatePresence>
 
         {/* Hero Slide Indicators */}
         <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-20 flex space-x-2 px-6 w-full max-w-md">
-          {HERO_IMAGES.map((_, idx) => (
+          {landscapeImages.map((_, idx) => (
             <div
               key={idx}
               className={`h-[2px] flex-1 transition-all duration-500 ${idx === currentHeroIndex ? "bg-brand-white" : "bg-brand-white/20"}`}

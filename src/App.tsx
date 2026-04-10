@@ -166,7 +166,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-brand-white selection:bg-brand-black selection:text-brand-white">
       {/* Navigation */}
-      <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${scrolled ? "bg-brand-white/80 backdrop-blur-md py-4 border-b border-brand-black/5" : "bg-transparent py-8"}`}>
+      <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${scrolled ? "bg-brand-white/80 backdrop-blur-md py-4 border-b border-brand-black/5 text-brand-black" : "bg-transparent py-8 text-brand-white"}`}>
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
@@ -188,7 +188,7 @@ export default function App() {
             className="md:hidden"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
           >
-            {isMenuOpen ? <X /> : <Menu />}
+            {isMenuOpen ? <X className={scrolled ? "text-brand-black" : "text-brand-white"} /> : <Menu className={scrolled ? "text-brand-black" : "text-brand-white"} />}
           </button>
         </div>
       </nav>

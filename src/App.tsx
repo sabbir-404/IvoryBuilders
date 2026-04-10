@@ -9,9 +9,7 @@ import {
   Wifi, 
   Wind, 
   Coffee, 
-  Tv, 
   ShieldCheck, 
-  Waves, 
   Car, 
   ChevronRight, 
   Play,
@@ -19,7 +17,11 @@ import {
   Menu,
   Send,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  Armchair,
+  Fan,
+  Lightbulb,
+  Lock
 } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
@@ -49,12 +51,12 @@ const STORAGE_BASE_URL = "https://your-project-id.supabase.co/storage/v1/object/
 const AMENITIES = [
   { icon: <Wifi className="w-5 h-5" />, label: "High-speed Wi-Fi" },
   { icon: <Wind className="w-5 h-5" />, label: "Air Conditioning" },
-  { icon: <Coffee className="w-5 h-5" />, label: "Fully Equipped Kitchen" },
-  { icon: <Tv className="w-5 h-5" />, label: "Smart TV" },
+  { icon: <Coffee className="w-5 h-5" />, label: "Equipped Kitchen" },
+  { icon: <Armchair className="w-5 h-5" />, label: "Full Furniture" },
   { icon: <ShieldCheck className="w-5 h-5" />, label: "24/7 Security" },
-  { icon: <Waves className="w-5 h-5" />, label: "Swimming Pool" },
-  { icon: <Car className="w-5 h-5" />, label: "Private Parking" },
-  { icon: <MapPin className="w-5 h-5" />, label: "Central Location" },
+  { icon: <Fan className="w-5 h-5" />, label: "Ceiling Fan" },
+  { icon: <Lightbulb className="w-5 h-5" />, label: "Premium Light" },
+  { icon: <Lock className="w-5 h-5" />, label: "Smart Door Lock" },
 ];
 
 const GALLERY_IMAGES = [
@@ -65,11 +67,18 @@ const GALLERY_IMAGES = [
   { src: `${STORAGE_BASE_URL}/gallery/05-balcony.jpg`, alt: "Balcony View", span: "col-span-2 row-span-1", fallback: "https://picsum.photos/seed/flat5/1200/800" },
 ];
 
+const HERO_IMAGES = [
+  { src: `${STORAGE_BASE_URL}/hero/hero-1.jpg`, fallback: "https://picsum.photos/seed/hero1/1920/1080" },
+  { src: `${STORAGE_BASE_URL}/hero/hero-2.jpg`, fallback: "https://picsum.photos/seed/hero2/1920/1080" },
+  { src: `${STORAGE_BASE_URL}/hero/hero-3.jpg`, fallback: "https://picsum.photos/seed/hero3/1920/1080" },
+];
+
 export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Form state
@@ -81,6 +90,13 @@ export default function App() {
     const handleScroll = () => setScrolled(window.scrollY > 50);
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentHeroIndex((prev) => (prev + 1) % HERO_IMAGES.length);
+    }, 5000);
+    return () => clearInterval(timer);
   }, []);
 
   const handleVideoPlay = () => {
@@ -126,7 +142,7 @@ export default function App() {
             animate={{ opacity: 1, x: 0 }}
             className="text-xl font-serif font-bold tracking-tight"
           >
-            LUXE<span className="font-light">FLAT</span>
+            IVORY<span className="font-light">BUILDERS</span>
           </motion.div>
           
           <div className="hidden md:flex space-x-12 text-xs uppercase tracking-[0.2em] font-medium">
@@ -173,21 +189,36 @@ export default function App() {
 
       {/* Hero Section */}
       <section className="relative h-screen flex items-center justify-center overflow-hidden">
-        <motion.div 
-          initial={{ scale: 1.1, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 1.5, ease: "easeOut" }}
-          className="absolute inset-0"
-        >
-          <img 
-            src={`${STORAGE_BASE_URL}/hero/main.jpg`} 
-            onError={(e) => (e.currentTarget.src = "https://picsum.photos/seed/hero/1920/1080")}
-            alt="Hero Flat" 
-            className="w-full h-full object-cover"
-            referrerPolicy="no-referrer"
-          />
-          <div className="absolute inset-0 bg-brand-black/20" />
-        </motion.div>
+        <AnimatePresence mode="wait">
+          <motion.div 
+            key={currentHeroIndex}
+            initial={{ scale: 1.1, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ opacity: 0, scale: 1.05 }}
+            transition={{ duration: 1.5, ease: "easeOut" }}
+            className="absolute inset-0"
+          >
+            <img 
+              src={HERO_IMAGES[currentHeroIndex].src} 
+              onError={(e) => (e.currentTarget.src = HERO_IMAGES[currentHeroIndex].fallback)}
+              alt={`Hero Flat ${currentHeroIndex + 1}`} 
+              className="w-full h-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute inset-0 bg-brand-black/20" />
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Hero Slide Indicators */}
+        <div className="absolute bottom-12 right-12 z-20 flex space-x-4">
+          {HERO_IMAGES.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => setCurrentHeroIndex(idx)}
+              className={`w-12 h-[2px] transition-all duration-500 ${idx === currentHeroIndex ? "bg-brand-white" : "bg-brand-white/30"}`}
+            />
+          ))}
+        </div>
 
         <div className="relative z-10 text-center text-brand-white px-6">
           <motion.p 
@@ -202,7 +233,7 @@ export default function App() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.7 }}
-            className="text-6xl md:text-8xl font-serif mb-8 leading-tight"
+            className="text-4xl md:text-8xl font-serif mb-8 leading-tight"
           >
             Modern Living <br /> <span className="italic">Redefined.</span>
           </motion.h1>
@@ -239,8 +270,8 @@ export default function App() {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
           >
-            <h2 className="text-4xl md:text-5xl font-serif mb-8 leading-tight">
-              A sanctuary of light <br /> and sophisticated <br /> <span className="italic">minimalism.</span>
+            <h2 className="text-3xl md:text-5xl font-serif mb-8 leading-tight">
+              A sanctuary of light <br className="hidden md:block" /> and sophisticated <br className="hidden md:block" /> <span className="italic">minimalism.</span>
             </h2>
           </motion.div>
           <motion.div
@@ -250,10 +281,10 @@ export default function App() {
             className="text-brand-black/60 leading-relaxed space-y-6"
           >
             <p>
-              Located in the heart of the city's most vibrant district, this 120sqm flat offers an unparalleled living experience. Every detail has been meticulously curated to balance aesthetic beauty with functional comfort.
+              Located in the prestigious Bashundhara Residential Area, Dhaka, this 6th-floor apartment offers a serene and secure living environment. Situated in Block-D on Abdur Sadeq Road (House 7p7q), it provides the perfect blend of luxury and convenience.
             </p>
             <p>
-              From the floor-to-ceiling windows that flood the space with natural light to the premium oak flooring and custom-built cabinetry, this is more than just a place to stay—it's a statement of lifestyle.
+              The space features modern architecture with premium lighting and smart security systems. Whether you're relaxing under the designer ceiling fans or enjoying the fully furnished interiors, every corner reflects a commitment to quality.
             </p>
           </motion.div>
         </div>
@@ -377,12 +408,12 @@ export default function App() {
                 <div className="flex items-start space-x-4">
                   <MapPin className="w-6 h-6 text-brand-white/40 mt-1" />
                   <div>
-                    <h4 className="font-medium text-lg mb-2">123 Minimalist Way</h4>
-                    <p className="text-brand-white/60">Skyline District, Central City, 10115</p>
+                    <h4 className="font-medium text-lg mb-2">House 7p7q, Abdur Sadeq Road</h4>
+                    <p className="text-brand-white/60">Block-D, Bashundhara R/A, Dhaka</p>
                   </div>
                 </div>
                 <p className="text-brand-white/60 leading-relaxed">
-                  Nestled between the historic arts district and the modern business hub, our flat offers the perfect balance of culture and convenience. You're just steps away from the city's finest cafes, galleries, and parks.
+                  Experience living in one of Dhaka's most organized and secure neighborhoods. This 6th-floor unit offers privacy and a great view of the surrounding residential landscape.
                 </p>
                 <div className="grid grid-cols-2 gap-8 pt-8 border-t border-brand-white/10">
                   <div>
@@ -397,14 +428,14 @@ export default function App() {
               </div>
             </div>
             <div className="relative aspect-square rounded-3xl overflow-hidden border border-brand-white/10 z-0">
-              <MapContainer center={[52.5200, 13.4050]} zoom={13} scrollWheelZoom={false} className="h-full w-full">
+              <MapContainer center={[23.81841802565013, 90.43040677748353]} zoom={16} scrollWheelZoom={false} className="h-full w-full">
                 <TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                   url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                 />
-                <Marker position={[52.5200, 13.4050]}>
+                <Marker position={[23.81841802565013, 90.43040677748353]}>
                   <Popup>
-                    LuxeFlat Rental <br /> 123 Minimalist Way
+                    Ivory Builders <br /> House 7p7q, Block-D, Bashundhara R/A
                   </Popup>
                 </Marker>
               </MapContainer>
@@ -508,7 +539,7 @@ export default function App() {
           <div className="grid md:grid-cols-4 gap-12 mb-24">
             <div className="col-span-2">
               <div className="text-2xl font-serif font-bold tracking-tight mb-6">
-                LUXE<span className="font-light">FLAT</span>
+                IVORY<span className="font-light">BUILDERS</span>
               </div>
               <p className="text-brand-black/60 max-w-sm leading-relaxed">
                 Elevating the standard of urban living through intentional design and uncompromising quality.
@@ -526,14 +557,14 @@ export default function App() {
             <div>
               <h4 className="text-xs uppercase tracking-widest font-bold mb-6">Contact</h4>
               <ul className="space-y-4 text-sm text-brand-black/60">
-                <li><a href="mailto:hello@luxeflat.com" className="hover:text-brand-black transition-colors">hello@luxeflat.com</a></li>
-                <li><a href="tel:+1234567890" className="hover:text-brand-black transition-colors">+1 (234) 567-890</a></li>
+                <li><a href="mailto:islam.hive@yahoo.com" className="hover:text-brand-black transition-colors">islam.hive@yahoo.com</a></li>
+                <li><a href="tel:01767842000" className="hover:text-brand-black transition-colors">01767842000</a></li>
               </ul>
             </div>
           </div>
           
           <div className="pt-12 border-t border-brand-black/5 flex flex-col md:flex-row justify-between items-center text-xs uppercase tracking-widest text-brand-black/40 space-y-4 md:space-y-0">
-            <p>© 2026 LuxeFlat Rental. All rights reserved.</p>
+            <p>© 2026 Ivory Builders. All rights reserved.</p>
             <div className="flex space-x-8">
               <a href="#" className="hover:text-brand-black transition-colors">Instagram</a>
               <a href="#" className="hover:text-brand-black transition-colors">LinkedIn</a>

@@ -59,19 +59,10 @@ const AMENITIES = [
   { icon: <Lock className="w-5 h-5" />, label: "Smart Door Lock" },
 ];
 
-const GALLERY_IMAGES = [
-  { src: `${STORAGE_BASE_URL}/gallery/01-living-room.jpg`, alt: "Living Room", span: "col-span-2 row-span-2", fallback: "https://picsum.photos/seed/flat1/1200/800" },
-  { src: `${STORAGE_BASE_URL}/gallery/02-bedroom.jpg`, alt: "Bedroom", span: "col-span-1 row-span-2", fallback: "https://picsum.photos/seed/flat2/800/1200" },
-  { src: `${STORAGE_BASE_URL}/gallery/03-kitchen.jpg`, alt: "Kitchen", span: "col-span-1 row-span-1", fallback: "https://picsum.photos/seed/flat3/800/800" },
-  { src: `${STORAGE_BASE_URL}/gallery/04-bathroom.jpg`, alt: "Bathroom", span: "col-span-1 row-span-1", fallback: "https://picsum.photos/seed/flat4/800/800" },
-  { src: `${STORAGE_BASE_URL}/gallery/05-balcony.jpg`, alt: "Balcony View", span: "col-span-2 row-span-1", fallback: "https://picsum.photos/seed/flat5/1200/800" },
-];
-
-const HERO_IMAGES = [
-  { src: `${STORAGE_BASE_URL}/hero/hero-1.jpg`, fallback: "https://picsum.photos/seed/hero1/1920/1080" },
-  { src: `${STORAGE_BASE_URL}/hero/hero-2.jpg`, fallback: "https://picsum.photos/seed/hero2/1920/1080" },
-  { src: `${STORAGE_BASE_URL}/hero/hero-3.jpg`, fallback: "https://picsum.photos/seed/hero3/1920/1080" },
-];
+const HERO_IMAGES = Array.from({ length: 35 }, (_, i) => ({
+  src: `${STORAGE_BASE_URL}/hero/${String(i + 1).padStart(2, '0')}.jpg`,
+  fallback: `https://picsum.photos/seed/hero${i + 1}/1920/1080`
+}));
 
 export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -95,7 +86,7 @@ export default function App() {
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentHeroIndex((prev) => (prev + 1) % HERO_IMAGES.length);
-    }, 5000);
+    }, 3500); // 3.5 seconds: quick but readable
     return () => clearInterval(timer);
   }, []);
 
@@ -210,12 +201,11 @@ export default function App() {
         </AnimatePresence>
 
         {/* Hero Slide Indicators */}
-        <div className="absolute bottom-12 right-12 z-20 flex space-x-4">
+        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-20 flex space-x-2 px-6 w-full max-w-md">
           {HERO_IMAGES.map((_, idx) => (
-            <button
+            <div
               key={idx}
-              onClick={() => setCurrentHeroIndex(idx)}
-              className={`w-12 h-[2px] transition-all duration-500 ${idx === currentHeroIndex ? "bg-brand-white" : "bg-brand-white/30"}`}
+              className={`h-[2px] flex-1 transition-all duration-500 ${idx === currentHeroIndex ? "bg-brand-white" : "bg-brand-white/20"}`}
             />
           ))}
         </div>
@@ -293,34 +283,32 @@ export default function App() {
       {/* Gallery Section */}
       <section id="gallery" className="py-24 bg-brand-gray">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="flex justify-between items-end mb-16">
-            <div>
-              <p className="text-xs uppercase tracking-widest text-brand-black/40 mb-4">Visual Tour</p>
-              <h2 className="text-4xl font-serif italic">The Space</h2>
-            </div>
+          <div className="mb-16">
+            <p className="text-xs uppercase tracking-widest text-brand-black/40 mb-4">Visual Tour</p>
+            <h2 className="text-4xl font-serif italic">The Collection</h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[300px]">
-            {GALLERY_IMAGES.map((img, idx) => (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {HERO_IMAGES.map((img, idx) => (
               <motion.div
                 key={idx}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: idx * 0.1 }}
-                className={`${img.span} relative group cursor-pointer overflow-hidden rounded-2xl`}
+                transition={{ delay: (idx % 8) * 0.05 }}
+                className="relative aspect-[4/3] group cursor-pointer overflow-hidden rounded-xl"
                 onClick={() => setSelectedImage(img.src)}
               >
                 <img 
                   src={img.src} 
                   onError={(e) => (e.currentTarget.src = img.fallback)}
-                  alt={img.alt} 
+                  alt={`Flat Image ${idx + 1}`} 
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                   referrerPolicy="no-referrer"
                 />
                 <div className="absolute inset-0 bg-brand-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-center justify-center">
-                  <span className="text-brand-white text-xs uppercase tracking-widest font-medium border border-brand-white/30 px-6 py-2 rounded-full">
-                    View Large
+                  <span className="text-brand-white text-[10px] uppercase tracking-widest font-medium border border-brand-white/30 px-4 py-1.5 rounded-full">
+                    Enlarge
                   </span>
                 </div>
               </motion.div>

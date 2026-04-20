@@ -21,12 +21,23 @@ import {
   Armchair,
   Fan,
   Lightbulb,
-  Lock
+  Lock,
+  Calendar,
+  Users,
+  Heart,
+  Home,
+  MapPinned,
+  ShieldAlert,
+  DollarSign
 } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
-import { supabase } from "@/src/lib/supabase";
+import { db, auth } from './lib/firebase';
+import { collection, addDoc, Timestamp, doc, onSnapshot } from 'firebase/firestore';
+import AdminPanel from './AdminPanel';
+import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
 
 // Fix Leaflet icon issue
 // @ts-ignore
@@ -61,22 +72,152 @@ const AMENITIES = [
 
 const HERO_IMAGES = Array.from({ length: 35 }, (_, i) => ({
   src: `${STORAGE_BASE_URL}/hero/${String(i + 1).padStart(2, '0')}.jpg`,
-  fallback: `https://picsum.photos/seed/hero${i + 1}/1920/1080`
+  fallback: `https://picsum.photos/seed/hero${i + 1}/1920/1080`,
+  caption: `View of the apartment space ${i + 1}`
 }));
+
+const Skeleton = ({ className }: { className?: string }) => (
+  <div className={`animate-pulse bg-brand-gray relative overflow-hidden ${className}`}>
+    <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-brand-white/10 to-transparent" />
+  </div>
+);
+
+const ImageWithSkeleton = ({ 
+  src, 
+  alt, 
+  className, 
+  fallback, 
+  loading = "lazy",
+  ...props 
+}: { 
+  src: string; 
+  alt: string; 
+  className?: string; 
+  fallback?: string;
+  loading?: "lazy" | "eager";
+  [key: string]: any;
+}) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+  
+  return (
+    <div className="relative w-full h-full overflow-hidden">
+      {!isLoaded && <Skeleton className="absolute inset-0 z-10" />}
+      <img
+        src={src}
+        alt={alt}
+        loading={loading}
+        className={`${className} transition-opacity duration-700 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+        onLoad={() => setIsLoaded(true)}
+        onError={(e) => {
+          if (fallback && e.currentTarget.src !== fallback) {
+            e.currentTarget.src = fallback;
+          }
+        }}
+        {...props}
+      />
+    </div>
+  );
+};
 
 export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
   const [landscapeImages, setLandscapeImages] = useState<typeof HERO_IMAGES>([]);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [monthlyRent, setMonthlyRent] = useState<number | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Form state
-  const [formState, setFormState] = useState({ name: '', email: '', message: '' });
+  const [formState, setFormState] = useState({ 
+    name: '', 
+    email: '', 
+    dob: '', 
+    residency: '', 
+    maritalStatus: 'unmarried', 
+    familyMembers: 1 
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  const validateField = (name: string, value: any) => {
+    let error = "";
+    if (name === "name") {
+      if (!value) error = "Full name is required";
+      else if (value.length < 3) error = "Name must be at least 3 characters";
+    }
+    if (name === "email") {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!value) error = "Email address is required";
+      else if (!emailRegex.test(value)) error = "Please enter a valid email address";
+    }
+    if (name === "dob") {
+      if (!value) error = "Date of birth is required";
+      else {
+        const birthDate = new Date(value);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
+        
+        if (age < 18) error = "Must be at least 18 years old to apply";
+        if (birthDate > today) error = "Date of birth cannot be in the future";
+      }
+    }
+    if (name === "residency") {
+      if (!value) error = "Residency information is required";
+    }
+    if (name === "familyMembers") {
+      if (!value || value < 1) error = "At least 1 family member is required";
+    }
+    
+    setFormErrors(prev => ({
+      ...prev,
+      [name]: error
+    }));
+    return error;
+  };
+
+  const handleInputChange = (field: string, value: any) => {
+    setFormState({ ...formState, [field]: value });
+    validateField(field, value);
+  };
+
+  useEffect(() => {
+    // Listen for rent updates
+    const unsub = onSnapshot(doc(db, 'settings', 'global'), (doc) => {
+      if (doc.exists()) {
+        setMonthlyRent(doc.data().monthlyRent);
+      }
+    });
+    return unsub;
+  }, []);
+
+  const nextImage = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (galleryIndex === null) return;
+    setGalleryIndex((prev) => (prev !== null ? (prev + 1) % HERO_IMAGES.length : 0));
+  };
+
+  const prevImage = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (galleryIndex === null) return;
+    setGalleryIndex((prev) => (prev !== null ? (prev - 1 + HERO_IMAGES.length) % HERO_IMAGES.length : 0));
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (galleryIndex === null) return;
+      if (e.key === 'ArrowRight') nextImage();
+      if (e.key === 'ArrowLeft') prevImage();
+      if (e.key === 'Escape') setGalleryIndex(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [galleryIndex]);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -143,21 +284,45 @@ export default function App() {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate all fields
+    const newErrors: Record<string, string> = {};
+    Object.keys(formState).forEach((key) => {
+      const error = validateField(key, (formState as any)[key]);
+      if (error) newErrors[key] = error;
+    });
+
+    if (Object.keys(newErrors).length > 0) {
+      setFormErrors(newErrors);
+      toast.error("Please fix the errors in the form.");
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitStatus('idle');
 
     try {
-      const { error } = await supabase
-        .from('inquiries')
-        .insert([formState]);
-
-      if (error) throw error;
+      await addDoc(collection(db, 'applications'), {
+        ...formState,
+        status: 'pending',
+        appliedAt: Timestamp.now(),
+        rentAtTimeOfApplication: monthlyRent
+      });
 
       setSubmitStatus('success');
-      setFormState({ name: '', email: '', message: '' });
+      setFormState({ 
+        name: '', 
+        email: '', 
+        dob: '', 
+        residency: '', 
+        maritalStatus: 'unmarried', 
+        familyMembers: 1 
+      });
+      toast.success("Application submitted successfully!");
     } catch (error) {
-      console.error('Error submitting inquiry:', error);
+      console.error('Error submitting application:', error);
       setSubmitStatus('error');
+      toast.error("Failed to submit application.");
     } finally {
       setIsSubmitting(false);
     }
@@ -166,20 +331,21 @@ export default function App() {
   return (
     <div className="min-h-screen bg-brand-white selection:bg-brand-black selection:text-brand-white">
       {/* Navigation */}
-      <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${scrolled ? "bg-brand-white/80 backdrop-blur-md py-4 border-b border-brand-black/5 text-brand-black" : "bg-transparent py-8 text-brand-white"}`}>
+      <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${scrolled ? "bg-brand-white/80 backdrop-blur-md py-3 md:py-4 border-b border-brand-black/5 text-brand-black" : "bg-transparent py-5 md:py-8 text-brand-white"}`}>
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             className="text-xl font-serif font-bold tracking-tight"
           >
-            IVORY<span className="font-light">BUILDERS</span>
+            AZMEREE
+            <span className="font-light italic ml-6">Ivory</span>
           </motion.div>
           
           <div className="hidden md:flex space-x-12 text-xs uppercase tracking-[0.2em] font-medium">
             {["Gallery", "Amenities", "Video", "Location", "Contact"].map((item) => (
               <a key={item} href={`#${item.toLowerCase()}`} className="hover:opacity-50 transition-opacity">
-                {item}
+                {item === "Contact" ? "Apply for Rent" : item}
               </a>
             ))}
           </div>
@@ -202,6 +368,11 @@ export default function App() {
             exit={{ opacity: 0, y: -20 }}
             className="fixed inset-0 z-40 bg-brand-white pt-24 px-6 md:hidden"
           >
+            <div className="mb-12 border-b border-brand-black/5 pb-8">
+              <div className="text-xl font-serif font-bold tracking-tight">
+                AZMEREE<span className="font-light italic ml-6">Ivory</span>
+              </div>
+            </div>
             <div className="flex flex-col space-y-8 text-2xl font-serif">
               {["Gallery", "Amenities", "Video", "Location", "Contact"].map((item) => (
                 <a 
@@ -210,7 +381,7 @@ export default function App() {
                   onClick={() => setIsMenuOpen(false)}
                   className="border-b border-brand-black/10 pb-4"
                 >
-                  {item}
+                  {item === "Contact" ? "Apply for Rent" : item}
                 </a>
               ))}
             </div>
@@ -219,84 +390,77 @@ export default function App() {
       </AnimatePresence>
 
       {/* Hero Section */}
-      <section className="relative h-screen flex items-center justify-center overflow-hidden bg-brand-black">
+      <section className="relative aspect-[4/3] md:aspect-auto md:h-screen flex items-center justify-center overflow-hidden bg-brand-black">
         <AnimatePresence mode="wait">
           {landscapeImages.length > 0 && (
             <motion.div 
               key={currentHeroIndex}
-              initial={{ scale: 1.1, opacity: 0 }}
+              initial={{ scale: 1.15, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ opacity: 0, scale: 1.05 }}
-              transition={{ duration: 1.5, ease: "easeOut" }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 2, ease: [0.22, 1, 0.36, 1] }}
               className="absolute inset-0"
             >
-              <img 
+              <ImageWithSkeleton 
                 src={landscapeImages[currentHeroIndex].src} 
-                onError={(e) => (e.currentTarget.src = landscapeImages[currentHeroIndex].fallback)}
+                fallback={landscapeImages[currentHeroIndex].fallback}
                 alt={`Hero Flat ${currentHeroIndex + 1}`} 
-                className="w-full h-full object-cover"
+                className="w-full h-full object-cover select-none"
+                loading="eager"
                 referrerPolicy="no-referrer"
               />
-              <div className="absolute inset-0 bg-brand-black/20" />
+              <div className="absolute inset-0 bg-gradient-to-b from-brand-black/20 via-transparent to-brand-black/60" />
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Hero Slide Indicators */}
-        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 z-20 flex space-x-2 px-6 w-full max-w-md">
-          {landscapeImages.map((_, idx) => (
-            <div
-              key={idx}
-              className={`h-[2px] flex-1 transition-all duration-500 ${idx === currentHeroIndex ? "bg-brand-white" : "bg-brand-white/20"}`}
-            />
-          ))}
-        </div>
-
-        <div className="relative z-10 text-center text-brand-white px-6">
-          <motion.p 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="text-xs uppercase tracking-[0.4em] mb-6 font-medium"
-          >
-            Available for Rent
-          </motion.p>
+        <div className="relative z-10 text-center text-brand-white px-6 max-w-4xl pt-20 md:pt-0">
           <motion.h1 
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7 }}
-            className="text-4xl md:text-8xl font-serif mb-8 leading-tight"
+            transition={{ delay: 0.2, duration: 1.5, ease: "easeOut" }}
+            className="text-4xl md:text-[10rem] font-serif italic mb-12 md:mb-16 leading-[1.1] md:leading-[0.95] tracking-tighter"
           >
-            Modern Living <br /> <span className="italic">Redefined.</span>
+            Azmeree <br /> Ivory
           </motion.h1>
+
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 1.2 }}
+            transition={{ delay: 1.2, duration: 1 }}
+            className="mb-10 md:mb-0"
           >
             <a 
               href="#gallery"
-              className="inline-flex items-center space-x-4 border border-brand-white/30 px-8 py-4 rounded-full hover:bg-brand-white hover:text-brand-black transition-all duration-500 group"
+              className="inline-flex items-center space-x-3 border border-brand-white/30 px-8 py-3 rounded-full hover:bg-brand-white hover:text-brand-black transition-all duration-500 group backdrop-blur-sm"
             >
-              <span className="text-xs uppercase tracking-widest font-medium">Explore the Space</span>
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              <span className="text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold">Discover the space</span>
+              <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
             </a>
           </motion.div>
         </div>
 
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.5, duration: 1 }}
-          className="absolute bottom-12 left-1/2 -translate-x-1/2"
-        >
-          <div className="w-[1px] h-16 bg-gradient-to-b from-brand-white/50 to-transparent" />
-        </motion.div>
+        {/* Simplified Hero Progress Bar */}
+        <div className="absolute bottom-8 left-8 right-8 md:bottom-12 md:left-32 md:right-32 z-20">
+          <div className="h-[1px] w-full bg-brand-white/10 relative overflow-hidden">
+            <motion.div 
+              className="absolute inset-y-0 left-0 bg-brand-white"
+              initial={{ width: "0%" }}
+              animate={{ width: `${((currentHeroIndex + 1) / landscapeImages.length) * 100}%` }}
+              transition={{ duration: 1, ease: "easeInOut" }}
+            />
+          </div>
+          <div className="flex justify-between mt-3 text-[9px] uppercase tracking-[0.2em] text-brand-white/40 font-mono">
+            <span>01</span>
+            <span className="text-brand-white/20">/</span>
+            <span>{String(landscapeImages.length).padStart(2, '0')}</span>
+          </div>
+        </div>
       </section>
 
       {/* About Section */}
-      <section className="py-32 px-6 max-w-7xl mx-auto">
-        <div className="grid md:grid-cols-2 gap-16 items-center">
+      <section className="py-16 md:py-32 px-6 max-w-7xl mx-auto bg-brand-white">
+        <div className="grid md:grid-cols-2 gap-8 md:gap-16 items-center">
           <motion.div
             initial={{ opacity: 0, x: -30 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -312,6 +476,17 @@ export default function App() {
             viewport={{ once: true }}
             className="text-brand-black/60 leading-relaxed space-y-6"
           >
+            {monthlyRent && (
+              <div className="inline-flex items-center space-x-4 bg-brand-gray px-6 py-4 rounded-2xl mb-4 border border-brand-black/5">
+                <div className="w-10 h-10 rounded-full bg-brand-white flex items-center justify-center shadow-sm">
+                  <DollarSign className="w-5 h-5 text-brand-black/40" />
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest font-bold text-brand-black/40">Available for Rent</p>
+                  <p className="text-xl font-serif italic text-brand-black">{monthlyRent.toLocaleString()} BDT <span className="text-xs not-italic font-sans opacity-40">/ month</span></p>
+                </div>
+              </div>
+            )}
             <p>
               Located in the prestigious Bashundhara Residential Area, Dhaka, this 6th-floor apartment offers a serene and secure living environment. Situated in Block-D on Abdur Sadeq Road (House 7p7q), it provides the perfect blend of luxury and convenience.
             </p>
@@ -323,9 +498,9 @@ export default function App() {
       </section>
 
       {/* Gallery Section */}
-      <section id="gallery" className="py-24 bg-brand-gray">
+      <section id="gallery" className="py-16 md:py-24 bg-brand-gray">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="mb-16">
+          <div className="mb-10 md:mb-16">
             <p className="text-xs uppercase tracking-widest text-brand-black/40 mb-4">Visual Tour</p>
             <h2 className="text-4xl font-serif italic">The Collection</h2>
           </div>
@@ -338,13 +513,14 @@ export default function App() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: (idx % 8) * 0.05 }}
-                className="relative aspect-[4/3] group cursor-pointer overflow-hidden rounded-xl"
-                onClick={() => setSelectedImage(img.src)}
+                className="relative aspect-[4/3] group cursor-pointer overflow-hidden rounded-xl bg-brand-gray"
+                onClick={() => setGalleryIndex(idx)}
               >
-                <img 
+                <ImageWithSkeleton 
                   src={img.src} 
-                  onError={(e) => (e.currentTarget.src = img.fallback)}
+                  fallback={img.fallback}
                   alt={`Flat Image ${idx + 1}`} 
+                  loading="lazy"
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                   referrerPolicy="no-referrer"
                 />
@@ -360,9 +536,9 @@ export default function App() {
       </section>
 
       {/* Amenities Section */}
-      <section id="amenities" className="py-32 px-6">
+      <section id="amenities" className="py-16 md:py-32 px-6 bg-brand-white">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-24">
+          <div className="text-center mb-12 md:mb-24">
             <p className="text-xs uppercase tracking-widest text-brand-black/40 mb-4">Comforts</p>
             <h2 className="text-4xl md:text-5xl font-serif">Premium Amenities</h2>
           </div>
@@ -388,9 +564,9 @@ export default function App() {
       </section>
 
       {/* Video Section */}
-      <section id="video" className="relative py-32 overflow-hidden bg-brand-gray">
+      <section id="video" className="relative py-16 md:py-32 overflow-hidden bg-brand-gray">
         <div className="max-w-5xl mx-auto px-6">
-          <div className="text-center mb-12">
+          <div className="text-center mb-10 md:mb-12">
             <p className="text-xs uppercase tracking-widest text-brand-black/40 mb-4">Cinematic Tour</p>
             <h2 className="text-4xl font-serif italic">Experience the Flow</h2>
           </div>
@@ -428,9 +604,9 @@ export default function App() {
       </section>
 
       {/* Location Section */}
-      <section id="location" className="py-32 bg-brand-black text-brand-white">
+      <section id="location" className="py-16 md:py-32 bg-brand-black text-brand-white">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="grid md:grid-cols-2 gap-24 items-center">
+          <div className="grid md:grid-cols-2 gap-12 md:gap-24 items-center">
             <div>
               <p className="text-xs uppercase tracking-widest text-brand-white/40 mb-4">Neighborhood</p>
               <h2 className="text-4xl md:text-5xl font-serif mb-8 italic">The Location</h2>
@@ -465,7 +641,7 @@ export default function App() {
                 />
                 <Marker position={[23.81841802565013, 90.43040677748353]}>
                   <Popup>
-                    Ivory Builders <br /> House 7p7q, Block-D, Bashundhara R/A
+                    Azmeree Ivory Builders <br /> House 7p7q, Block-D, Bashundhara R/A
                   </Popup>
                 </Marker>
               </MapContainer>
@@ -474,90 +650,202 @@ export default function App() {
         </div>
       </section>
 
-      {/* Contact Section */}
-      <section id="contact" className="py-32 px-6">
-        <div className="max-w-3xl mx-auto">
-          <div className="text-center mb-16">
-            <p className="text-xs uppercase tracking-widest text-brand-black/40 mb-4">Inquiry</p>
-            <h2 className="text-4xl md:text-5xl font-serif">Get in Touch</h2>
+      {/* Contact/Application Section */}
+      <section id="contact" className="py-16 md:py-32 bg-brand-white">
+        <div className="max-w-4xl mx-auto px-6">
+          <div className="text-center mb-12 md:mb-20">
+            <p className="text-xs uppercase tracking-widest text-brand-black/40 mb-4">Rental Application</p>
+            <h2 className="text-4xl md:text-5xl font-serif italic mb-6">Show Your Interest</h2>
+            <p className="text-brand-black/60 max-w-lg mx-auto leading-relaxed text-sm md:text-base">
+              Complete the form below to apply for tenancy. Our team will review your application and contact you for further steps.
+            </p>
           </div>
 
-          <form onSubmit={handleFormSubmit} className="space-y-8">
-            <div className="grid md:grid-cols-2 gap-8">
-              <div className="space-y-2">
-                <label className="text-xs uppercase tracking-widest font-medium text-brand-black/60">Name</label>
+          <form onSubmit={handleFormSubmit} noValidate className="space-y-6 md:space-y-12 bg-brand-gray/30 p-6 md:p-16 rounded-[32px] md:rounded-[40px] border border-brand-black/5">
+            <div className="grid md:grid-cols-2 gap-6 md:gap-10">
+              <div className="space-y-2 md:space-y-3">
+                <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-black/40 flex items-center">
+                  <Users className="w-3 h-3 mr-2" /> Full Name
+                </label>
                 <input 
-                  required
                   type="text" 
                   value={formState.name}
-                  onChange={(e) => setFormState({...formState, name: e.target.value})}
-                  className="w-full bg-brand-gray border-none rounded-xl px-6 py-4 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all"
-                  placeholder="Your name"
+                  onChange={(e) => handleInputChange('name', e.target.value)}
+                  className={`w-full bg-brand-white border-2 rounded-2xl px-5 md:px-6 py-4 md:py-5 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.name ? 'border-red-400' : 'border-transparent'}`}
+                  placeholder="John Doe"
                 />
+                <AnimatePresence>
+                  {formErrors.name && (
+                    <motion.p 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="text-[10px] text-red-500 font-medium ml-1"
+                    >
+                      {formErrors.name}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
               </div>
-              <div className="space-y-2">
-                <label className="text-xs uppercase tracking-widest font-medium text-brand-black/60">Email</label>
+              <div className="space-y-2 md:space-y-3">
+                <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-black/40 flex items-center">
+                  <Send className="w-3 h-3 mr-2" /> Email Address
+                </label>
                 <input 
-                  required
                   type="email" 
                   value={formState.email}
-                  onChange={(e) => setFormState({...formState, email: e.target.value})}
-                  className="w-full bg-brand-gray border-none rounded-xl px-6 py-4 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all"
-                  placeholder="Your email"
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  className={`w-full bg-brand-white border-2 rounded-2xl px-5 md:px-6 py-4 md:py-5 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.email ? 'border-red-400' : 'border-transparent'}`}
+                  placeholder="john@example.com"
                 />
+                <AnimatePresence>
+                  {formErrors.email && (
+                    <motion.p 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="text-[10px] text-red-500 font-medium ml-1"
+                    >
+                      {formErrors.email}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs uppercase tracking-widest font-medium text-brand-black/60">Message</label>
-              <textarea 
-                required
-                rows={5}
-                value={formState.message}
-                onChange={(e) => setFormState({...formState, message: e.target.value})}
-                className="w-full bg-brand-gray border-none rounded-xl px-6 py-4 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all resize-none"
-                placeholder="How can we help you?"
-              />
+
+            <div className="grid md:grid-cols-2 gap-6 md:gap-10">
+              <div className="space-y-2 md:space-y-3">
+                <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-black/40 flex items-center">
+                  <Calendar className="w-3 h-3 mr-2" /> Date of Birth
+                </label>
+                <input 
+                  type="date" 
+                  value={formState.dob}
+                  onChange={(e) => handleInputChange('dob', e.target.value)}
+                  className={`w-full bg-brand-white border-2 rounded-2xl px-5 md:px-6 py-4 md:py-5 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.dob ? 'border-red-400' : 'border-transparent'}`}
+                />
+                <AnimatePresence>
+                  {formErrors.dob && (
+                    <motion.p 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="text-[10px] text-red-500 font-medium ml-1"
+                    >
+                      {formErrors.dob}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+              </div>
+              <div className="space-y-2 md:space-y-3">
+                <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-black/40 flex items-center">
+                  <MapPinned className="w-3 h-3 mr-2" /> Residency (Where are you from?)
+                </label>
+                <input 
+                  type="text" 
+                  value={formState.residency}
+                  onChange={(e) => handleInputChange('residency', e.target.value)}
+                  className={`w-full bg-brand-white border-2 rounded-2xl px-5 md:px-6 py-4 md:py-5 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.residency ? 'border-red-400' : 'border-transparent'}`}
+                  placeholder="City, Country"
+                />
+                <AnimatePresence>
+                  {formErrors.residency && (
+                    <motion.p 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="text-[10px] text-red-500 font-medium ml-1"
+                    >
+                      {formErrors.residency}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
 
-            <div className="flex flex-col items-center space-y-6">
+            <div className="grid md:grid-cols-2 gap-6 md:gap-10">
+              <div className="space-y-2 md:space-y-3">
+                <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-black/40 flex items-center">
+                  <Heart className="w-3 h-3 mr-2" /> Marital Status
+                </label>
+                <select 
+                  value={formState.maritalStatus}
+                  onChange={(e) => handleInputChange('maritalStatus', e.target.value)}
+                  className="w-full bg-brand-white border-2 border-transparent rounded-2xl px-5 md:px-6 py-4 md:py-5 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm appearance-none"
+                >
+                  <option value="unmarried">Unmarried</option>
+                  <option value="married">Married</option>
+                </select>
+              </div>
+              <div className="space-y-2 md:space-y-3">
+                <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-black/40 flex items-center">
+                  <Home className="w-3 h-3 mr-2" /> Family Members
+                </label>
+                <input 
+                  type="number" 
+                  min="1"
+                  value={formState.familyMembers}
+                  onChange={(e) => handleInputChange('familyMembers', parseInt(e.target.value))}
+                  className={`w-full bg-brand-white border-2 rounded-2xl px-5 md:px-6 py-4 md:py-5 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.familyMembers ? 'border-red-400' : 'border-transparent'}`}
+                />
+                <AnimatePresence>
+                  {formErrors.familyMembers && (
+                    <motion.p 
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="text-[10px] text-red-500 font-medium ml-1"
+                    >
+                      {formErrors.familyMembers}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+
+            <div className="flex flex-col items-center pt-8">
               <button 
                 type="submit"
                 disabled={isSubmitting}
-                className="inline-flex items-center space-x-4 bg-brand-black text-brand-white px-12 py-5 rounded-full hover:opacity-90 transition-all disabled:opacity-50 group"
+                className="inline-flex items-center space-x-6 bg-brand-black text-brand-white px-16 py-6 rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 group shadow-xl shadow-brand-black/10"
               >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    <span className="text-sm uppercase tracking-widest font-medium">Sending...</span>
+                    <span className="text-sm uppercase tracking-[0.2em] font-bold">Processing...</span>
                   </>
                 ) : (
                   <>
-                    <span className="text-sm uppercase tracking-widest font-medium">Send Inquiry</span>
+                    <span className="text-sm uppercase tracking-[0.2em] font-bold">Submit Application</span>
                     <Send className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
                   </>
                 )}
               </button>
 
-              {submitStatus === 'success' && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex items-center space-x-2 text-green-600 font-medium"
-                >
-                  <CheckCircle2 className="w-5 h-5" />
-                  <span>Inquiry sent successfully! We'll get back to you soon.</span>
-                </motion.div>
-              )}
-
-              {submitStatus === 'error' && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="text-red-500 font-medium"
-                >
-                  Something went wrong. Please try again later.
-                </motion.div>
-              )}
+              <AnimatePresence>
+                {submitStatus === 'success' && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="mt-8 flex items-center space-x-3 text-green-600 font-medium bg-green-50 px-6 py-3 rounded-full"
+                  >
+                    <CheckCircle2 className="w-5 h-5" />
+                    <span className="text-sm">Application submitted! We'll review and contact you.</span>
+                  </motion.div>
+                )}
+                {submitStatus === 'error' && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0 }}
+                    className="mt-8 text-red-500 font-medium bg-red-50 px-6 py-3 rounded-full flex items-center space-x-2"
+                  >
+                    <ShieldAlert className="w-5 h-5" />
+                    <span className="text-sm">Submission failed. Please try again.</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </form>
         </div>
@@ -569,7 +857,7 @@ export default function App() {
           <div className="grid md:grid-cols-4 gap-12 mb-24">
             <div className="col-span-2">
               <div className="text-2xl font-serif font-bold tracking-tight mb-6">
-                IVORY<span className="font-light">BUILDERS</span>
+                AZMEREE<span className="font-light italic ml-6">Ivory</span>
               </div>
               <p className="text-brand-black/60 max-w-sm leading-relaxed">
                 Elevating the standard of urban living through intentional design and uncompromising quality.
@@ -581,7 +869,7 @@ export default function App() {
                 <li><a href="#gallery" className="hover:text-brand-black transition-colors">Gallery</a></li>
                 <li><a href="#amenities" className="hover:text-brand-black transition-colors">Amenities</a></li>
                 <li><a href="#location" className="hover:text-brand-black transition-colors">Location</a></li>
-                <li><a href="#contact" className="hover:text-brand-black transition-colors">Contact</a></li>
+                <li><a href="#contact" className="hover:text-brand-black transition-colors">Apply for Rent</a></li>
               </ul>
             </div>
             <div>
@@ -594,8 +882,9 @@ export default function App() {
           </div>
           
           <div className="pt-12 border-t border-brand-black/5 flex flex-col md:flex-row justify-between items-center text-xs uppercase tracking-widest text-brand-black/40 space-y-4 md:space-y-0">
-            <p>© 2026 Ivory Builders. All rights reserved.</p>
+            <p>© 2026 Azmeree Ivory Builders. All rights reserved.</p>
             <div className="flex space-x-8">
+              <button onClick={() => setIsAdminOpen(true)} className="hover:text-brand-black transition-colors">Admin Portal</button>
               <a href="#" className="hover:text-brand-black transition-colors">Instagram</a>
               <a href="#" className="hover:text-brand-black transition-colors">LinkedIn</a>
             </div>
@@ -603,27 +892,79 @@ export default function App() {
         </div>
       </footer>
 
+      {/* Admin Panel Overlay */}
+      <AnimatePresence>
+        {isAdminOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110]"
+          >
+            <AdminPanel onClose={() => setIsAdminOpen(false)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <Toaster position="top-center" />
+
       {/* Image Modal */}
       <AnimatePresence>
-        {selectedImage && (
+        {galleryIndex !== null && (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-brand-black/95 flex items-center justify-center p-6"
-            onClick={() => setSelectedImage(null)}
+            className="fixed inset-0 z-[100] bg-brand-black/95 flex items-center justify-center p-4 md:p-12"
+            onClick={() => setGalleryIndex(null)}
           >
-            <button className="absolute top-8 right-8 text-brand-white">
+            <button 
+              className="absolute top-8 right-8 text-brand-white z-[110]"
+              onClick={() => setGalleryIndex(null)}
+            >
               <X className="w-8 h-8" />
             </button>
-            <motion.img 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              src={selectedImage} 
-              alt="Full view" 
-              className="max-w-full max-h-full object-contain rounded-lg"
-              referrerPolicy="no-referrer"
-            />
+
+            <button 
+              className="absolute left-4 md:left-8 top-1/2 -translate-y-1/2 text-brand-white/50 hover:text-brand-white transition-colors"
+              onClick={prevImage}
+            >
+              <div className="p-3 md:p-5 rounded-full border border-brand-white/20 hover:bg-brand-white/10">
+                <ChevronRight className="w-6 h-6 md:w-8 md:h-8 rotate-180" />
+              </div>
+            </button>
+
+            <button 
+              className="absolute right-4 md:right-8 top-1/2 -translate-y-1/2 text-brand-white/50 hover:text-brand-white transition-colors"
+              onClick={nextImage}
+            >
+              <div className="p-3 md:p-5 rounded-full border border-brand-white/20 hover:bg-brand-white/10">
+                <ChevronRight className="w-6 h-6 md:w-8 md:h-8" />
+              </div>
+            </button>
+
+            <div className="max-w-5xl w-full flex flex-col items-center space-y-6">
+              <div className="max-h-[70vh] md:max-h-[80vh] w-full" onClick={(e) => e.stopPropagation()}>
+                <ImageWithSkeleton 
+                  key={galleryIndex}
+                  src={HERO_IMAGES[galleryIndex].src} 
+                  fallback={HERO_IMAGES[galleryIndex].fallback}
+                  alt="Full view" 
+                  className="max-h-[70vh] md:max-h-[80vh] w-full object-contain rounded-lg shadow-2xl"
+                  referrerPolicy="no-referrer"
+                  loading="eager"
+                />
+              </div>
+              <motion.div 
+                key={`caption-${galleryIndex}`}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-center px-6"
+              >
+                <p className="text-brand-white text-lg font-serif italic">{HERO_IMAGES[galleryIndex].caption}</p>
+                <p className="text-brand-white/40 text-[10px] uppercase tracking-widest mt-2">{galleryIndex + 1} / {HERO_IMAGES.length}</p>
+              </motion.div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

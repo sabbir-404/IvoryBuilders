@@ -1,0 +1,55 @@
+{
+  "entities": {
+    "Settings": {
+      "title": "Settings",
+      "description": "Global application settings like current rent.",
+      "type": "object",
+      "properties": {
+        "monthlyRent": { "type": "number", "description": "The current monthly rent amount." },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["monthlyRent"]
+    },
+    "Application": {
+      "title": "Application",
+      "description": "Tenant rental application details.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "dob": { "type": "string", "format": "date" },
+        "residency": { "type": "string", "description": "Where they are from" },
+        "maritalStatus": { "type": "string", "enum": ["married", "unmarried"] },
+        "familyMembers": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected", "accepted"] },
+        "appliedAt": { "type": "string", "format": "date-time" },
+        "rentAtTimeOfApplication": { "type": "number" }
+      },
+      "required": ["name", "email", "dob", "residency", "maritalStatus", "familyMembers"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Admin user details.",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin"] }
+      },
+      "required": ["username", "role"]
+    }
+  },
+  "firestore": {
+    "/settings/global": {
+      "schema": "Settings",
+      "description": "Global configuration document."
+    },
+    "/applications/{applicationId}": {
+      "schema": "Application",
+      "description": "Collection of tenant applications."
+    },
+    "/admins/{adminId}": {
+      "schema": "Admin",
+      "description": "Collection of admin users."
+    }
+  }
+}

@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (request.auth.token.email == "SABBIRISLAMALVI070800@gmail.com") ||
+        (request.auth.token.email == "islam@azmeree.com") ||
+        (request.auth.token.email == "sabbir@azmeree.com")
+      );
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /settings/global {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /applications/{applicationId} {
+      allow create: if true; // Anyone can apply
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /admins/{adminId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+  }
+}

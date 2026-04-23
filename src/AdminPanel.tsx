@@ -112,6 +112,7 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
   const [authLoading, setAuthLoading] = useState(false);
   const [applications, setApplications] = useState<any[]>([]);
   const [monthlyRent, setMonthlyRent] = useState<number>(0);
+  const [outdoorImage, setOutdoorImage] = useState<string>('');
   const [newAdminUsername, setNewAdminUsername] = useState('');
   const [newAdminPassword, setNewAdminPassword] = useState('');
 
@@ -137,6 +138,7 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
       const unsubRent = onSnapshot(doc(db, 'settings', 'global'), (doc) => {
         if (doc.exists()) {
           setMonthlyRent(doc.data().monthlyRent);
+          setOutdoorImage(doc.data().outdoorImage || '');
         }
       }, (error) => {
         handleFirestoreError(error, OperationType.GET, 'settings/global');
@@ -247,9 +249,10 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
     try {
       await setDoc(doc(db, 'settings', 'global'), { 
         monthlyRent, 
+        outdoorImage,
         updatedAt: Timestamp.now() 
       }, { merge: true });
-      toast.success('Rent updated successfully');
+      toast.success('Settings updated successfully');
     } catch (error: any) {
       handleFirestoreError(error, OperationType.WRITE, 'settings/global');
     }
@@ -501,8 +504,8 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
             <TabsContent value="settings" className="mt-0">
               <Card className="max-w-md border-none shadow-sm bg-brand-gray/50 rounded-3xl">
                 <CardHeader>
-                  <CardTitle className="font-serif">Global Rent Configuration</CardTitle>
-                  <CardDescription>Set the standard monthly rent for Azmeree Ivory Builders</CardDescription>
+                  <CardTitle className="font-serif">App Settings</CardTitle>
+                  <CardDescription>Manage monthly rent and featured images</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="space-y-2">
@@ -514,6 +517,19 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
                         type="number" 
                         value={monthlyRent} 
                         onChange={(e) => setMonthlyRent(Number(e.target.value))}
+                        className="pl-12 py-6 rounded-xl bg-brand-white border-none shadow-sm"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="outdoor-image">Outdoor Image URL</Label>
+                    <div className="relative">
+                      <Home className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-black/40" />
+                      <Input 
+                        id="outdoor-image" 
+                        value={outdoorImage} 
+                        onChange={(e) => setOutdoorImage(e.target.value)}
+                        placeholder="Public URL to exterior image"
                         className="pl-12 py-6 rounded-xl bg-brand-white border-none shadow-sm"
                       />
                     </div>

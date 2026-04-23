@@ -28,31 +28,26 @@ import {
   Home,
   MapPinned,
   ShieldAlert,
-  DollarSign
+  DollarSign,
+  ChefHat,
+  Sofa,
+  Monitor,
+  Bed,
+  Bath,
+  Utensils,
+  GraduationCap,
+  Building2,
+  Navigation,
+  School,
+  ShoppingBag,
+  ExternalLink
 } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import L from 'leaflet';
 import { db, auth } from './lib/firebase';
 import { collection, addDoc, Timestamp, doc, onSnapshot } from 'firebase/firestore';
 import AdminPanel from './AdminPanel';
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
-
-// Fix Leaflet icon issue
-// @ts-ignore
-import icon from 'leaflet/dist/images/marker-icon.png';
-// @ts-ignore
-import iconShadow from 'leaflet/dist/images/marker-shadow.png';
-
-let DefaultIcon = L.icon({
-    iconUrl: icon,
-    shadowUrl: iconShadow,
-    iconSize: [25, 41],
-    iconAnchor: [12, 41]
-});
-
-L.Marker.prototype.options.icon = DefaultIcon;
 
 // --- CONFIGURATION ---
 // Replace this with your actual Supabase Storage Public URL
@@ -60,14 +55,110 @@ L.Marker.prototype.options.icon = DefaultIcon;
 const STORAGE_BASE_URL = "https://eulxcwxefaaamjsfblqx.supabase.co/storage/v1/object/public/flat-assets";
 
 const AMENITIES = [
-  { icon: <Wifi className="w-5 h-5" />, label: "High-speed Wi-Fi" },
-  { icon: <Wind className="w-5 h-5" />, label: "Air Conditioning" },
-  { icon: <Coffee className="w-5 h-5" />, label: "Equipped Kitchen" },
-  { icon: <Armchair className="w-5 h-5" />, label: "Full Furniture" },
+  { icon: <Car className="w-5 h-5" />, label: "Dedicated Car Parking" },
+  { icon: <Users className="w-5 h-5" />, label: "2 Spacious Elevators" },
   { icon: <ShieldCheck className="w-5 h-5" />, label: "24/7 Security" },
-  { icon: <Fan className="w-5 h-5" />, label: "Ceiling Fan" },
-  { icon: <Lightbulb className="w-5 h-5" />, label: "Premium Light" },
-  { icon: <Lock className="w-5 h-5" />, label: "Smart Door Lock" },
+  { icon: <Wind className="w-5 h-5" />, label: "Full Generator Support" },
+  { icon: <Coffee className="w-5 h-5" />, label: "Contemporary Kitchen" },
+  { icon: <Fan className="w-5 h-5" />, label: "Premium Ceiling Fans" },
+  { icon: <Lightbulb className="w-5 h-5" />, label: "Decorative Lighting" },
+  { icon: <Home className="w-5 h-5" />, label: "4 Spacious Bedrooms" },
+];
+
+const LANDMARKS = [
+  { 
+    name: "Evercare Hospital", 
+    distance: "3 mins", 
+    distKm: "1.2 km", 
+    category: "Healthcare", 
+    icon: <ShieldAlert className="w-5 h-5" />, 
+    link: "https://maps.google.com/?q=Evercare+Hospital+Dhaka",
+    usp: "State-of-the-art multi-disciplinary medical facility."
+  },
+  { 
+    name: "Jamuna Future Park", 
+    distance: "5 mins", 
+    distKm: "2.1 km", 
+    category: "Mall", 
+    icon: <ShoppingBag className="w-5 h-5" />, 
+    link: "https://maps.google.com/?q=Jamuna+Future+Park",
+    usp: "Asia's largest shopping mall and entertainment hub."
+  },
+  { 
+    name: "ICCB", 
+    distance: "7 mins", 
+    category: "Expo", 
+    distKm: "2.8 km", 
+    icon: <Building2 className="w-5 h-5" />, 
+    link: "https://maps.google.com/?q=International+Convention+City+Bashundhara",
+    usp: "The country's premier event and exhibition destination."
+  },
+  { 
+    name: "300 Feet Road", 
+    distance: "4 mins", 
+    category: "Transit", 
+    distKm: "1.5 km", 
+    icon: <Navigation className="w-5 h-5" />, 
+    link: "https://maps.google.com/?q=300+Feet+Road+Dhaka",
+    usp: "Scenic Purbachal highway, the gateway to new Dhaka."
+  },
+  { 
+    name: "IUB & NSU", 
+    distance: "5 mins", 
+    category: "Education", 
+    distKm: "1.8 km", 
+    icon: <GraduationCap className="w-5 h-5" />, 
+    link: "https://maps.google.com/?q=Independent+University+Bangladesh",
+    usp: "Leading private universities for academic excellence."
+  },
+  { 
+    name: "English Medium Schools", 
+    distance: "2 mins", 
+    category: "Education", 
+    distKm: "0.5 km", 
+    icon: <School className="w-5 h-5" />, 
+    link: "https://maps.google.com/?q=International+School+Dhaka",
+    usp: "Top-tier international schools within walking distance."
+  }
+];
+
+const RESIDENCE_FEATURES = [
+  {
+    icon: <Sofa className="w-5 h-5 md:w-6 md:h-6" />,
+    title: "Formal Living & Foyer",
+    description: "Elegantly designed with modern interior finishes, featuring curated hanging gardens and abundant natural daylight.",
+    details: "Premium ceiling fans, decorative lighting, and a warm, welcoming ambiance."
+  },
+  {
+    icon: <ChefHat className="w-5 h-5 md:w-6 md:h-6" />,
+    title: "Contemporary Kitchen",
+    description: "Fully functional with high-quality cabinetry, grocer organizer, and stylish breakfast counter.",
+    details: "Premium kitchen hood, marble countertops, and hot water supply."
+  },
+  {
+    icon: <Monitor className="w-5 h-5 md:w-6 md:h-6" />,
+    title: "Family Living Area",
+    description: "Cozy lounge with custom TV cabinet and workstation setup, ideal for everyday relaxation.",
+    details: "High-speed connectivity, decorative lighting, and large windows."
+  },
+  {
+    icon: <Bed className="w-5 h-5 md:w-6 md:h-6" />,
+    title: "Master Suite & Bedrooms",
+    description: "Appointed with walk-in closets, workstations, and private balconies with cloth drying rails.",
+    details: "Master bedroom includes air cooler and night lamps for ultimate comfort."
+  },
+  {
+    icon: <Bath className="w-5 h-5 md:w-6 md:h-6" />,
+    title: "Modern Bathrooms",
+    description: "Imported sanitary fittings and TOTO wall-hung WCs with glass-enclosed shower areas.",
+    details: "Hot water supply across all units, plus a dedicated separate maid's bathroom."
+  },
+  {
+    icon: <Utensils className="w-5 h-5 md:w-6 md:h-6" />,
+    title: "Dining & Foyer",
+    description: "Refined dining space enhanced with modern aesthetics and generous natural daylight.",
+    details: "Comfortable setting for family dining with designer fixtures."
+  }
 ];
 
 const HERO_IMAGES = Array.from({ length: 35 }, (_, i) => ({
@@ -125,9 +216,12 @@ export default function App() {
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
+  const [currentFeatureIndex, setCurrentFeatureIndex] = useState(0);
+  const featuresRef = useRef<HTMLDivElement>(null);
   const [landscapeImages, setLandscapeImages] = useState<typeof HERO_IMAGES>([]);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [monthlyRent, setMonthlyRent] = useState<number | null>(null);
+  const [outdoorImage, setOutdoorImage] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Form state
@@ -187,10 +281,12 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Listen for rent updates
+    // Listen for rent and settings updates
     const unsub = onSnapshot(doc(db, 'settings', 'global'), (doc) => {
       if (doc.exists()) {
-        setMonthlyRent(doc.data().monthlyRent);
+        const data = doc.data();
+        setMonthlyRent(data.monthlyRent);
+        setOutdoorImage(data.outdoorImage || null);
       }
     });
     return unsub;
@@ -271,6 +367,26 @@ export default function App() {
     return () => clearInterval(timer);
   }, [landscapeImages.length]);
 
+  // Auto-sliding for features on mobile
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (window.innerWidth < 768) {
+        setCurrentFeatureIndex((prev) => (prev + 1) % RESIDENCE_FEATURES.length);
+      }
+    }, 4000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (featuresRef.current && window.innerWidth < 768) {
+      const scrollAmount = currentFeatureIndex * (window.innerWidth * 0.85 + 24); // 85vw + gap
+      featuresRef.current.scrollTo({
+        left: scrollAmount,
+        behavior: 'smooth'
+      });
+    }
+  }, [currentFeatureIndex]);
+
   const handleVideoPlay = () => {
     if (videoRef.current) {
       if (isVideoPlaying) {
@@ -338,7 +454,7 @@ export default function App() {
             animate={{ opacity: 1, x: 0 }}
             className="text-xl font-serif font-bold tracking-tight"
           >
-            AZMEREE
+            AJMERI
             <span className="font-light italic ml-6">Ivory</span>
           </motion.div>
           
@@ -370,7 +486,7 @@ export default function App() {
           >
             <div className="mb-12 border-b border-brand-black/5 pb-8">
               <div className="text-xl font-serif font-bold tracking-tight">
-                AZMEREE<span className="font-light italic ml-6">Ivory</span>
+                AJMERI<span className="font-light italic ml-6">Ivory</span>
               </div>
             </div>
             <div className="flex flex-col space-y-8 text-2xl font-serif">
@@ -414,14 +530,14 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        <div className="relative z-10 text-center text-brand-white px-6 max-w-4xl pt-20 md:pt-0">
+        <div className="relative z-10 text-center text-brand-white px-6 max-w-4xl pt-12 md:pt-0">
           <motion.h1 
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 1.5, ease: "easeOut" }}
-            className="text-4xl md:text-[10rem] font-serif italic mb-12 md:mb-16 leading-[1.1] md:leading-[0.95] tracking-tighter"
+            className="text-4xl md:text-[10rem] font-serif italic mb-6 md:mb-12 leading-[1.1] md:leading-[0.95] tracking-tighter"
           >
-            Azmeree <br /> Ivory
+            Ajmeri <br /> Ivory
           </motion.h1>
 
           <motion.div
@@ -432,10 +548,10 @@ export default function App() {
           >
             <a 
               href="#gallery"
-              className="inline-flex items-center space-x-3 border border-brand-white/30 px-8 py-3 rounded-full hover:bg-brand-white hover:text-brand-black transition-all duration-500 group backdrop-blur-sm"
+              className="inline-flex items-center space-x-2 border border-brand-white/30 px-5 py-2 rounded-full hover:bg-brand-white hover:text-brand-black transition-all duration-500 group backdrop-blur-sm"
             >
-              <span className="text-[10px] md:text-xs uppercase tracking-[0.3em] font-bold">Discover the space</span>
-              <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+              <span className="text-[9px] md:text-[10px] uppercase tracking-[0.2em] font-bold">Discover the space</span>
+              <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
             </a>
           </motion.div>
         </div>
@@ -458,47 +574,200 @@ export default function App() {
         </div>
       </section>
 
-      {/* About Section */}
-      <section className="py-16 md:py-32 px-6 max-w-7xl mx-auto bg-brand-white">
-        <div className="grid md:grid-cols-2 gap-8 md:gap-16 items-center">
+      {/* About/Info Section with Rounded Top Corners */}
+      <section className="relative -mt-10 md:-mt-20 py-8 md:py-16 px-6 max-w-7xl mx-auto bg-brand-white rounded-t-[40px] md:rounded-t-[64px] z-20">
+        <div className="grid md:grid-cols-2 gap-4 md:gap-8 items-start">
           <motion.div
             initial={{ opacity: 0, x: -30 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
+            className="pt-4 md:pt-0"
           >
-            <h2 className="text-3xl md:text-5xl font-serif mb-8 leading-tight">
-              A sanctuary of light <br className="hidden md:block" /> and sophisticated <br className="hidden md:block" /> <span className="italic">minimalism.</span>
+            <h2 className="text-3xl md:text-5xl font-serif mb-0.5 md:mb-1 leading-[1.05] md:leading-[1.05]">
+              A 2,150 SFT <br className="hidden md:block" /> sanctuary of refined <br className="hidden md:block" /> <span className="italic">modern living.</span>
             </h2>
           </motion.div>
           <motion.div
             initial={{ opacity: 0, x: 30 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
-            className="text-brand-black/60 leading-relaxed space-y-6"
+            className="text-brand-black/60 leading-relaxed space-y-4"
           >
-            {monthlyRent && (
-              <div className="inline-flex items-center space-x-4 bg-brand-gray px-6 py-4 rounded-2xl mb-4 border border-brand-black/5">
-                <div className="w-10 h-10 rounded-full bg-brand-white flex items-center justify-center shadow-sm">
-                  <DollarSign className="w-5 h-5 text-brand-black/40" />
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase tracking-widest font-bold text-brand-black/40">Available for Rent</p>
-                  <p className="text-xl font-serif italic text-brand-black">{monthlyRent.toLocaleString()} BDT <span className="text-xs not-italic font-sans opacity-40">/ month</span></p>
-                </div>
+            {/* Quick-Specs Highlight Bar with Icons */}
+            <div className="flex items-center justify-between py-4 border-y border-brand-black/5 mb-4">
+              <div className="flex-1 flex flex-col items-center md:items-start text-center md:text-left">
+                <Home className="w-4 h-4 text-brand-black/20 mb-2" />
+                <p className="text-[9px] uppercase tracking-widest font-bold text-brand-black/20 mb-0.5">Size</p>
+                <p className="text-sm font-bold text-brand-black">2,150 SFT</p>
               </div>
-            )}
-            <p>
-              Located in the prestigious Bashundhara Residential Area, Dhaka, this 6th-floor apartment offers a serene and secure living environment. Situated in Block-D on Abdur Sadeq Road (House 7p7q), it provides the perfect blend of luxury and convenience.
-            </p>
-            <p>
-              The space features modern architecture with premium lighting and smart security systems. Whether you're relaxing under the designer ceiling fans or enjoying the fully furnished interiors, every corner reflects a commitment to quality.
-            </p>
+              <div className="w-[1px] h-10 bg-brand-black/10 mx-2" />
+              <div className="flex-1 flex flex-col items-center text-center">
+                <Users className="w-4 h-4 text-brand-black/20 mb-2" />
+                <p className="text-[9px] uppercase tracking-widest font-bold text-brand-black/20 mb-0.5">Layout</p>
+                <p className="text-sm font-bold text-brand-black">4 Bedrooms</p>
+              </div>
+              <div className="w-[1px] h-10 bg-brand-black/10 mx-2" />
+              <div className="flex-1 flex flex-col items-center md:items-end text-center md:text-right">
+                <MapPinned className="w-4 h-4 text-brand-black/20 mb-2" />
+                <p className="text-[9px] uppercase tracking-widest font-bold text-brand-black/20 mb-0.5">Floor</p>
+                <p className="text-sm font-bold text-brand-black">5th Floor</p>
+              </div>
+            </div>
+
+            <div className="space-y-4 md:space-y-5">
+              {monthlyRent && (
+                <div className="inline-flex items-center space-x-4 bg-brand-gray px-6 py-2.5 rounded-full border border-brand-black/5 mb-1">
+                  <DollarSign className="w-4 h-4 text-brand-black/40" />
+                  <p className="text-sm font-serif italic text-brand-black">Premium Residency: <span className="not-italic font-bold ml-1">{monthlyRent.toLocaleString()} BDT</span></p>
+                </div>
+              )}
+              <p>
+                Perfectly located in Bashundhara Residential Area (Block-D), AJMERI IVORY offers a beautifully interior-designed 2,150 SFT apartment on the 5th floor. Situated on a 40-foot-wide road, this residence ensures excellent accessibility and a serene atmosphere.
+              </p>
+              
+              {outdoorImage && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  className="relative aspect-video rounded-3xl overflow-hidden border border-brand-black/5 shadow-sm my-6"
+                >
+                  <ImageWithSkeleton 
+                    src={outdoorImage} 
+                    alt="Outdoor View" 
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-brand-black/40 to-transparent flex items-end p-4">
+                    <p className="text-brand-white text-[10px] uppercase tracking-widest font-bold">Architectural Exterior</p>
+                  </div>
+                </motion.div>
+              )}
+
+              <p>
+                This elegant home features 4 well-appointed bedrooms, a formal living area with a foyer, and a separate family lounge. The thoughtfully crafted layout combines a refined dining space with a contemporary kitchen, reflecting a commitment to both functionality and modern aesthetics.
+              </p>
+            </div>
           </motion.div>
         </div>
       </section>
 
+      {/* Nearby Landmarks Section */}
+      <section className="py-8 md:py-16 px-6 bg-brand-gray/30">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-10 md:mb-16">
+            <p className="text-xs uppercase tracking-widest text-brand-black/40 mb-4">Prime Location</p>
+            <h2 className="text-4xl md:text-5xl font-serif italic">Connected <span className="not-italic">Convenience</span></h2>
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-6">
+            {LANDMARKS.map((landmark, idx) => (
+              <motion.a
+                key={idx}
+                href={landmark.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.1 }}
+                className="bg-brand-white p-6 rounded-[32px] border border-brand-black/5 flex flex-col items-center text-center group hover:bg-brand-black transition-all duration-500"
+              >
+                <div className="mb-4 p-3 bg-brand-gray rounded-full group-hover:bg-brand-white/10 group-hover:text-brand-white transition-colors relative">
+                  {landmark.icon}
+                  <ExternalLink className="absolute -top-1 -right-1 w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+                <p className="text-[10px] uppercase tracking-widest font-bold text-brand-black/20 mb-1 group-hover:text-brand-white/40">{landmark.category}</p>
+                <h3 className="text-xs font-bold text-brand-black group-hover:text-brand-white mb-2 leading-tight">{landmark.name}</h3>
+                <p className="text-[10px] leading-relaxed text-brand-black/50 group-hover:text-brand-white/60 mb-4 px-2 italic line-clamp-2">"{landmark.usp}"</p>
+                <div className="mt-auto pt-3 border-t border-brand-black/5 group-hover:border-brand-white/10 w-full">
+                  <p className="text-[10px] font-bold text-brand-black/60 group-hover:text-brand-white/80 mb-0.5">{landmark.distKm}</p>
+                  <p className="text-[10px] italic text-brand-black/40 group-hover:text-brand-white/40">~ {landmark.distance}</p>
+                </div>
+              </motion.a>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Residence Features Grid */}
+      <section className="py-8 md:py-16 px-6 bg-brand-white overflow-hidden">
+        <div className="max-w-7xl mx-auto">
+          <div className="mb-10 md:mb-16 flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-8">
+            <div className="max-w-2xl">
+              <p className="text-xs uppercase tracking-widest text-brand-black/40 mb-4">Interior Excellence</p>
+              <h2 className="text-4xl md:text-6xl font-serif italic leading-[1.1]">Sophisticated <br /> <span className="not-italic">Craftsmanship</span></h2>
+            </div>
+          </div>
+          
+          <div 
+            ref={featuresRef}
+            className="flex md:grid md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-12 overflow-x-auto md:overflow-visible pb-8 md:pb-0 snap-x no-scrollbar"
+            onScroll={(e) => {
+              if (window.innerWidth < 768) {
+                const scrollLeft = e.currentTarget.scrollLeft;
+                const itemWidth = window.innerWidth * 0.85 + 24;
+                const index = Math.round(scrollLeft / itemWidth);
+                if (index !== currentFeatureIndex) {
+                  setCurrentFeatureIndex(index);
+                }
+              }
+            }}
+          >
+            {RESIDENCE_FEATURES.map((feature, idx) => (
+              <motion.div
+                key={idx}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.1 }}
+                className="group p-8 md:p-10 bg-brand-gray/30 rounded-[32px] md:rounded-[40px] border border-brand-black/5 hover:bg-brand-black hover:text-brand-white transition-all duration-700 min-w-[85vw] md:min-w-0 snap-center flex flex-col justify-between"
+              >
+                <div>
+                  <div className="mb-6 md:mb-8 flex items-center justify-between">
+                    <div className="p-3 w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-brand-white border border-brand-black/5 flex items-center justify-center group-hover:bg-brand-white/10 group-hover:border-brand-white/20 transition-all duration-500">
+                      <span className="text-brand-black group-hover:text-brand-white font-serif text-sm md:text-base">{String(idx + 1).padStart(2, '0')}</span>
+                    </div>
+                    <div className="text-brand-black/40 group-hover:text-brand-white/40 transition-colors">
+                      {feature.icon}
+                    </div>
+                  </div>
+                  <h3 className="text-lg md:text-2xl font-serif mb-4 md:mb-6 group-hover:text-brand-white transition-colors">{feature.title}</h3>
+                  <p className="text-xs md:text-sm leading-relaxed mb-6 group-hover:text-brand-white/70 transition-colors">{feature.description}</p>
+                </div>
+                <div className="pt-6 border-t border-brand-black/5 group-hover:border-brand-white/10">
+                  <p className="text-[9px] md:text-[10px] uppercase tracking-widest font-bold mb-2 group-hover:text-brand-white/40">Key Highlights</p>
+                  <p className="text-[11px] md:text-xs italic leading-relaxed group-hover:text-brand-white/60">{feature.details}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Feature Carousel Indicators - Mobile Only */}
+          <div className="flex md:hidden justify-center space-x-2 mt-6">
+            {RESIDENCE_FEATURES.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => {
+                  setCurrentFeatureIndex(idx);
+                  if (featuresRef.current) {
+                    const itemWidth = window.innerWidth * 0.85 + 24;
+                    featuresRef.current.scrollTo({
+                      left: idx * itemWidth,
+                      behavior: 'smooth'
+                    });
+                  }
+                }}
+                className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+                  currentFeatureIndex === idx ? 'w-6 bg-brand-black' : 'bg-brand-black/20'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Gallery Section */}
-      <section id="gallery" className="py-16 md:py-24 bg-brand-gray">
+      <section id="gallery" className="py-8 md:py-16 bg-brand-gray">
         <div className="max-w-7xl mx-auto px-6">
           <div className="mb-10 md:mb-16">
             <p className="text-xs uppercase tracking-widest text-brand-black/40 mb-4">Visual Tour</p>
@@ -536,9 +805,9 @@ export default function App() {
       </section>
 
       {/* Amenities Section */}
-      <section id="amenities" className="py-16 md:py-32 px-6 bg-brand-white">
+      <section id="amenities" className="py-8 md:py-16 px-6 bg-brand-white">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-12 md:mb-24">
+          <div className="text-center mb-10 md:mb-16">
             <p className="text-xs uppercase tracking-widest text-brand-black/40 mb-4">Comforts</p>
             <h2 className="text-4xl md:text-5xl font-serif">Premium Amenities</h2>
           </div>
@@ -551,10 +820,22 @@ export default function App() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: idx * 0.05 }}
-                className="flex flex-col items-center text-center space-y-4"
+                className="flex flex-col items-center text-center space-y-4 group relative"
               >
-                <div className="w-16 h-16 rounded-full bg-brand-gray flex items-center justify-center text-brand-black/80">
+                <div className="w-16 h-16 rounded-full bg-brand-gray flex items-center justify-center text-brand-black/80 relative">
                   {item.icon}
+                  {/* Tooltip */}
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.8, y: 10, x: '-50%' }}
+                    whileHover={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute -top-12 left-1/2 pointer-events-none z-30"
+                  >
+                    <div className="bg-brand-black text-brand-white text-[10px] uppercase tracking-widest font-bold px-3 py-1.5 rounded-lg whitespace-nowrap shadow-xl">
+                      {item.label}
+                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-brand-black rotate-45" />
+                    </div>
+                  </motion.div>
                 </div>
                 <span className="text-sm font-medium tracking-tight text-brand-black/70">{item.label}</span>
               </motion.div>
@@ -564,9 +845,9 @@ export default function App() {
       </section>
 
       {/* Video Section */}
-      <section id="video" className="relative py-16 md:py-32 overflow-hidden bg-brand-gray">
+      <section id="video" className="relative py-8 md:py-16 overflow-hidden bg-brand-gray">
         <div className="max-w-5xl mx-auto px-6">
-          <div className="text-center mb-10 md:mb-12">
+          <div className="text-center mb-8 md:mb-10">
             <p className="text-xs uppercase tracking-widest text-brand-black/40 mb-4">Cinematic Tour</p>
             <h2 className="text-4xl font-serif italic">Experience the Flow</h2>
           </div>
@@ -604,7 +885,7 @@ export default function App() {
       </section>
 
       {/* Location Section */}
-      <section id="location" className="py-16 md:py-32 bg-brand-black text-brand-white">
+      <section id="location" className="py-8 md:py-16 bg-brand-black text-brand-white">
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid md:grid-cols-2 gap-12 md:gap-24 items-center">
             <div>
@@ -614,46 +895,57 @@ export default function App() {
                 <div className="flex items-start space-x-4">
                   <MapPin className="w-6 h-6 text-brand-white/40 mt-1" />
                   <div>
-                    <h4 className="font-medium text-lg mb-2">House 7p7q, Abdur Sadeq Road</h4>
-                    <p className="text-brand-white/60">Block-D, Bashundhara R/A, Dhaka</p>
+                    <h4 className="font-medium text-lg mb-2 text-brand-white">AJMERI IVORY, Block-D, Bashundhara R/A</h4>
+                    <p className="text-brand-white/60 font-serif italic">House-7P & 7Q, Abdus Sadek Sarak</p>
                   </div>
                 </div>
                 <p className="text-brand-white/60 leading-relaxed">
-                  Experience living in one of Dhaka's most organized and secure neighborhoods. This 6th-floor unit offers privacy and a great view of the surrounding residential landscape.
+                  Ideally situated on a 40-foot-wide road, providing effortless connectivity to Dhaka's most essential landmarks including Evercare Hospital, Jamuna Future Park, and ICCB.
                 </p>
-                <div className="grid grid-cols-2 gap-8 pt-8 border-t border-brand-white/10">
+                <div className="grid grid-cols-2 gap-4 md:gap-8 pt-8 border-t border-brand-white/10">
                   <div>
-                    <p className="text-xs uppercase tracking-widest text-brand-white/40 mb-2">Transit</p>
-                    <p className="text-sm">5 min to Central Station</p>
+                    <p className="text-[10px] uppercase tracking-widest text-brand-white/40 mb-3">Healthcare & Retail</p>
+                    <p className="text-xs leading-relaxed text-brand-white/80">Minutes from Evercare & Jamuna Future Park</p>
                   </div>
                   <div>
-                    <p className="text-xs uppercase tracking-widest text-brand-white/40 mb-2">Groceries</p>
-                    <p className="text-sm">2 min to Organic Market</p>
+                    <p className="text-[10px] uppercase tracking-widest text-brand-white/40 mb-3">Connectivity</p>
+                    <p className="text-xs leading-relaxed text-brand-white/80">300 Feet Road Access & 40ft Wide Entrance</p>
                   </div>
+                </div>
+                <div className="space-y-4 pt-4">
+                  <a 
+                    href="https://www.google.com/maps/dir/?api=1&destination=23.818418,90.430407"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center space-x-3 bg-brand-white text-brand-black px-8 py-3 rounded-full hover:bg-brand-gray transition-colors group"
+                  >
+                    <Navigation className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+                    <span className="text-xs uppercase tracking-widest font-bold">Get Directions</span>
+                  </a>
                 </div>
               </div>
             </div>
-            <div className="relative aspect-square rounded-3xl overflow-hidden border border-brand-white/10 z-0">
-              <MapContainer center={[23.81841802565013, 90.43040677748353]} zoom={16} scrollWheelZoom={false} className="h-full w-full">
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                <Marker position={[23.81841802565013, 90.43040677748353]}>
-                  <Popup>
-                    Azmeree Ivory Builders <br /> House 7p7q, Block-D, Bashundhara R/A
-                  </Popup>
-                </Marker>
-              </MapContainer>
+            <div className="relative aspect-square rounded-3xl overflow-hidden border border-brand-white/10 z-0 bg-brand-gray/10">
+              <iframe 
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3650.098083818617!2d90.4282181!3d23.818418!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMjPCsDQ5JzA2LjMiTiA5MMKwMjUnNDEuNiJF!5e0!3m2!1sen!2sbd!4v1713890000000!5m2!1sen!2sbd" 
+                width="100%" 
+                height="100%" 
+                style={{ border: 0 }} 
+                allowFullScreen={true} 
+                loading="lazy" 
+                referrerPolicy="no-referrer-when-downgrade"
+                title="Google Maps Location"
+                className="grayscale brightness-[0.8] contrast-[1.2] hover:grayscale-0 transition-all duration-700"
+              />
             </div>
           </div>
         </div>
       </section>
 
       {/* Contact/Application Section */}
-      <section id="contact" className="py-16 md:py-32 bg-brand-white">
+      <section id="contact" className="py-8 md:py-16 bg-brand-white">
         <div className="max-w-4xl mx-auto px-6">
-          <div className="text-center mb-12 md:mb-20">
+          <div className="text-center mb-10 md:mb-16">
             <p className="text-xs uppercase tracking-widest text-brand-black/40 mb-4">Rental Application</p>
             <h2 className="text-4xl md:text-5xl font-serif italic mb-6">Show Your Interest</h2>
             <p className="text-brand-black/60 max-w-lg mx-auto leading-relaxed text-sm md:text-base">
@@ -857,19 +1149,27 @@ export default function App() {
           <div className="grid md:grid-cols-4 gap-12 mb-24">
             <div className="col-span-2">
               <div className="text-2xl font-serif font-bold tracking-tight mb-6">
-                AZMEREE<span className="font-light italic ml-6">Ivory</span>
+                AJMERI<span className="font-light italic ml-6">Ivory</span>
               </div>
               <p className="text-brand-black/60 max-w-sm leading-relaxed">
-                Elevating the standard of urban living through intentional design and uncompromising quality.
+                Elevating the standard of urban living at AJMERI IVORY through intentional design and uncompromising quality.
               </p>
             </div>
             <div>
-              <h4 className="text-xs uppercase tracking-widest font-bold mb-6">Quick Links</h4>
+              <h4 className="text-xs uppercase tracking-widest font-bold mb-6">Address</h4>
+              <p className="text-brand-black/60 text-sm leading-relaxed max-w-[200px]">
+                AJMERI IVORY,<br />
+                House-7P & 7Q (5th floor),<br />
+                Abdus Sadek Sarak,<br />
+                Bashundhara R/A, Dhaka
+              </p>
+            </div>
+            <div>
+              <h4 className="text-xs uppercase tracking-widest font-bold mb-6">Proximity</h4>
               <ul className="space-y-4 text-sm text-brand-black/60">
-                <li><a href="#gallery" className="hover:text-brand-black transition-colors">Gallery</a></li>
-                <li><a href="#amenities" className="hover:text-brand-black transition-colors">Amenities</a></li>
-                <li><a href="#location" className="hover:text-brand-black transition-colors">Location</a></li>
-                <li><a href="#contact" className="hover:text-brand-black transition-colors">Apply for Rent</a></li>
+                <li><a href="#location" className="hover:text-brand-black transition-colors">Evercare Hospital</a></li>
+                <li><a href="#location" className="hover:text-brand-black transition-colors">Jamuna Future Park</a></li>
+                <li><a href="#location" className="hover:text-brand-black transition-colors">ICCB & 300 Feet Rd</a></li>
               </ul>
             </div>
             <div>
@@ -882,7 +1182,7 @@ export default function App() {
           </div>
           
           <div className="pt-12 border-t border-brand-black/5 flex flex-col md:flex-row justify-between items-center text-xs uppercase tracking-widest text-brand-black/40 space-y-4 md:space-y-0">
-            <p>© 2026 Azmeree Ivory Builders. All rights reserved.</p>
+            <p>© 2026 Ajmeri Ivory. All rights reserved.</p>
             <div className="flex space-x-8">
               <button onClick={() => setIsAdminOpen(true)} className="hover:text-brand-black transition-colors">Admin Portal</button>
               <a href="#" className="hover:text-brand-black transition-colors">Instagram</a>

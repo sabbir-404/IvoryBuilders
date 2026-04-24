@@ -36,5 +36,9 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
+
+    match /stats/visits {
+      allow read, create, update: if true;
+    }
   }
 }

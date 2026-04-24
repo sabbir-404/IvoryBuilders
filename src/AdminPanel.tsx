@@ -113,6 +113,7 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
   const [applications, setApplications] = useState<any[]>([]);
   const [monthlyRent, setMonthlyRent] = useState<number>(0);
   const [outdoorImage, setOutdoorImage] = useState<string>('');
+  const [visitorCount, setVisitorCount] = useState<number>(0);
   const [newAdminUsername, setNewAdminUsername] = useState('');
   const [newAdminPassword, setNewAdminPassword] = useState('');
 
@@ -144,9 +145,19 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
         handleFirestoreError(error, OperationType.GET, 'settings/global');
       });
 
+      // Fetch visitor count
+      const unsubVisits = onSnapshot(doc(db, 'stats', 'visits'), (doc) => {
+        if (doc.exists()) {
+          setVisitorCount(doc.data().visitorCount || 0);
+        }
+      }, (error) => {
+        handleFirestoreError(error, OperationType.GET, 'stats/visits');
+      });
+
       return () => {
         unsubApps();
         unsubRent();
+        unsubVisits();
       };
     }
   }, [user]);
@@ -422,6 +433,22 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
             <TabsContent value="applications" className="flex-1 overflow-hidden mt-0">
               <ScrollArea className="h-full pr-4">
                 <div className="grid gap-6">
+                  {/* Stats Summary */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-2">
+                    <Card className="border-none shadow-sm bg-brand-black text-brand-white rounded-2xl">
+                      <CardHeader className="p-4 pb-2">
+                        <CardDescription className="text-brand-white/60 text-[10px] uppercase tracking-widest">Total Visits</CardDescription>
+                        <CardTitle className="text-xl md:text-2xl font-serif">{visitorCount.toLocaleString()}</CardTitle>
+                      </CardHeader>
+                    </Card>
+                    <Card className="border-none shadow-sm bg-brand-gray/50 rounded-2xl">
+                      <CardHeader className="p-4 pb-2">
+                        <CardDescription className="text-brand-black/40 text-[10px] uppercase tracking-widest">Applications</CardDescription>
+                        <CardTitle className="text-xl md:text-2xl font-serif">{applications.length}</CardTitle>
+                      </CardHeader>
+                    </Card>
+                  </div>
+
                   {applications.length === 0 ? (
                     <div className="text-center py-24 bg-brand-gray rounded-3xl border-2 border-dashed">
                       <Users className="w-12 h-12 mx-auto text-brand-black/10 mb-4" />

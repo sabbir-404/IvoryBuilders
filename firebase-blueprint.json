@@ -36,9 +36,21 @@
         "role": { "type": "string", "enum": ["admin"] }
       },
       "required": ["username", "role"]
+    },
+    "Stats": {
+      "title": "Stats",
+      "description": "Website statistics like visitor count.",
+      "type": "object",
+      "properties": {
+        "visitorCount": { "type": "number" }
+      }
     }
   },
   "firestore": {
+    "stats/visits": {
+      "schema": "Stats",
+      "description": "Counter for website visits."
+    },
     "/settings/global": {
       "schema": "Settings",
       "description": "Global configuration document."

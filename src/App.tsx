@@ -44,7 +44,7 @@ import {
 } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 import { db, auth } from './lib/firebase';
-import { collection, addDoc, Timestamp, doc, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, Timestamp, doc, onSnapshot, increment, updateDoc, setDoc, getDoc } from 'firebase/firestore';
 import AdminPanel from './AdminPanel';
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
@@ -55,11 +55,12 @@ import { toast } from "sonner";
 const STORAGE_BASE_URL = "https://eulxcwxefaaamjsfblqx.supabase.co/storage/v1/object/public/flat-assets";
 
 const AMENITIES = [
-  { icon: <Car className="w-5 h-5" />, label: "Dedicated Car Parking" },
+  { icon: <Car className="w-5 h-5" />, label: "1 Dedicated Car Parking" },
   { icon: <Users className="w-5 h-5" />, label: "2 Spacious Elevators" },
   { icon: <ShieldCheck className="w-5 h-5" />, label: "24/7 Security" },
-  { icon: <Wind className="w-5 h-5" />, label: "Full Generator Support" },
-  { icon: <Coffee className="w-5 h-5" />, label: "Contemporary Kitchen" },
+  { icon: <Wind className="w-5 h-5" />, label: "Genarator support" },
+  { icon: <Wind className="w-5 h-5" />, label: "1 AC Provided" },
+  { icon: <Lock className="w-5 h-5" />, label: "Smart Door Lock" },
   { icon: <Fan className="w-5 h-5" />, label: "Premium Ceiling Fans" },
   { icon: <Lightbulb className="w-5 h-5" />, label: "Decorative Lighting" },
   { icon: <Home className="w-5 h-5" />, label: "4 Spacious Bedrooms" },
@@ -72,6 +73,7 @@ const LANDMARKS = [
     distKm: "1.2 km", 
     category: "Healthcare", 
     icon: <ShieldAlert className="w-5 h-5" />, 
+    image: "https://lh3.googleusercontent.com/p/AF1QipOsVpt3Pt58pLm-CkPlzhmQcEve3M34LQL1lcC7=s1360-w1360-h1020-rw",
     link: "https://maps.google.com/?q=Evercare+Hospital+Dhaka",
     usp: "State-of-the-art multi-disciplinary medical facility."
   },
@@ -81,6 +83,7 @@ const LANDMARKS = [
     distKm: "2.1 km", 
     category: "Mall", 
     icon: <ShoppingBag className="w-5 h-5" />, 
+    image: "https://lh3.googleusercontent.com/gps-cs-s/APNQkAET2dpTFQxTYGU70x_6MTOj3filxyItA9Ek0rGdSeSl9bE62QH8GZJ9vRiQ5zm673D8M9_c3vXVs2zoqYGcdqMXH1GBlvCXoaqcDLYEc4t_JWPABw8zzjmnXv7AxXC3J0h0BIpvpGVv6UzB=s1360-w1360-h1020-rw",
     link: "https://maps.google.com/?q=Jamuna+Future+Park",
     usp: "Asia's largest shopping mall and entertainment hub."
   },
@@ -90,6 +93,7 @@ const LANDMARKS = [
     category: "Expo", 
     distKm: "2.8 km", 
     icon: <Building2 className="w-5 h-5" />, 
+    image: "https://dhaka.wordcamp.org/2019/files/2019/05/ICCB-WordCamp-Dhaka-2019-Venue.png",
     link: "https://maps.google.com/?q=International+Convention+City+Bashundhara",
     usp: "The country's premier event and exhibition destination."
   },
@@ -99,6 +103,7 @@ const LANDMARKS = [
     category: "Transit", 
     distKm: "1.5 km", 
     icon: <Navigation className="w-5 h-5" />, 
+    image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcREMSeefSq9OwPAN9pAjr6ClLKWBqUL9f5BCg&s",
     link: "https://maps.google.com/?q=300+Feet+Road+Dhaka",
     usp: "Scenic Purbachal highway, the gateway to new Dhaka."
   },
@@ -108,17 +113,39 @@ const LANDMARKS = [
     category: "Education", 
     distKm: "1.8 km", 
     icon: <GraduationCap className="w-5 h-5" />, 
+    image: "https://nwc.education/wp-content/uploads/2024/11/2023-06-16.jpg",
     link: "https://maps.google.com/?q=Independent+University+Bangladesh",
     usp: "Leading private universities for academic excellence."
   },
   { 
-    name: "English Medium Schools", 
+    name: "Rupayan Shopping Square", 
     distance: "2 mins", 
-    category: "Education", 
-    distKm: "0.5 km", 
-    icon: <School className="w-5 h-5" />, 
-    link: "https://maps.google.com/?q=International+School+Dhaka",
-    usp: "Top-tier international schools within walking distance."
+    category: "Shopping", 
+    distKm: "0.6 km", 
+    icon: <ShoppingBag className="w-5 h-5" />, 
+    image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQiZKfho5FnzQpuSceAe2ikjbDNoWc-ztxs8Q&s",
+    link: "https://maps.google.com/?q=Rupayan+Shopping+Square",
+    usp: "A modern commercial and retail landmark in Bashundhara."
+  },
+  { 
+    name: "Apon Family Mart (Unit 2)", 
+    distance: "1 min", 
+    category: "Supermarket", 
+    distKm: "0.2 km", 
+    icon: <ShoppingBag className="w-5 h-5" />, 
+    image: "https://lh3.googleusercontent.com/gps-cs-s/APNQkAEGcIMlorew6fPFuViA0M83C-kNH0nG0fAGJj47R4s0_TFOaCJLg7t0HYLzQA-nmSrRHMJso3NrKLvsluEVZN99onDVZhjChLcIx2C1qE6FXSqoHDDZk2cEMNjhr_VGgY2LauX0qPHHKw8q=w408-h306-k-no",
+    link: "https://maps.app.goo.gl/x1x8DKTVwuinwgpTA",
+    usp: "Daily essentials and premium grocery just steps away."
+  },
+  { 
+    name: "Aga Khan Foundation", 
+    distance: "5 mins", 
+    category: "Organization", 
+    distKm: "1.5 km", 
+    icon: <Building2 className="w-5 h-5" />, 
+    image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRQCcI2XD_zuUllQ4RkoGEJUcE0oi4dqxAXPA&s",
+    link: "https://maps.google.com/?q=Aga+Khan+Academy+Dhaka",
+    usp: "Global development network and educational excellence."
   }
 ];
 
@@ -161,11 +188,128 @@ const RESIDENCE_FEATURES = [
   }
 ];
 
+const COLLECTION_CATALOG = [
+  { id: 'Master_Bedroom', label: 'Master Bedroom' },
+  { id: '2nd_Bedroom', label: '2nd Bedroom' },
+  { id: '3rd_bedroom', label: '3rd Bedroom' },
+  { id: 'Bathroom', label: 'Bathroom' },
+  { id: 'Dining_area', label: 'Dining Area' },
+  { id: 'Family_Living', label: 'Family Living' },
+  { id: 'Formal_Living', label: 'Formal Living' },
+  { id: 'Foyer', label: 'Foyer' },
+];
+
 const HERO_IMAGES = Array.from({ length: 35 }, (_, i) => ({
   src: `${STORAGE_BASE_URL}/hero/${String(i + 1).padStart(2, '0')}.jpg`,
   fallback: `https://picsum.photos/seed/hero${i + 1}/1920/1080`,
   caption: `View of the apartment space ${i + 1}`
 }));
+
+const CollectionSection = ({ 
+  category, 
+  onImageClick 
+}: { 
+  category: typeof COLLECTION_CATALOG[0], 
+  onImageClick: (src: string, label: string) => void
+}) => {
+  const [images, setImages] = useState<{ src: string, ratio: number }[]>([]);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchImages = async () => {
+      setIsLoading(true);
+      const categoryImages: { src: string, ratio: number }[] = [];
+      
+      // Attempt to load up to 20 images per category
+      const checkImages = Array.from({ length: 20 }, (_, i) => {
+        const src = `${STORAGE_BASE_URL}/${category.id}/${String(i + 1).padStart(2, '0')}.jpg`;
+        return new Promise<{ src: string, ratio: number } | null>((resolve) => {
+          const img = new Image();
+          img.src = src;
+          // Set crossOrigin if needed, though referrerPolicy is used
+          img.onload = () => {
+            resolve({ src, ratio: img.naturalWidth / img.naturalHeight });
+          };
+          img.onerror = () => resolve(null);
+        });
+      });
+
+      const results = await Promise.all(checkImages);
+      setImages(results.filter((img): img is { src: string, ratio: number } => img !== null));
+      setIsLoading(false);
+    };
+
+    fetchImages();
+  }, [category.id]);
+
+  const visibleImages = isExpanded ? images : images.slice(0, 4);
+
+  if (isLoading) return <div className="py-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-brand-black/20" /></div>;
+  if (images.length === 0) return null;
+
+  return (
+    <div className="relative">
+      <div className="flex items-end justify-between mb-8 md:mb-12 px-2">
+        <div>
+          <h3 className="text-2xl md:text-4xl font-serif mb-2">{category.label}</h3>
+          <p className="text-[10px] uppercase tracking-widest text-brand-black/40 font-bold">{images.length} Images in Collection</p>
+        </div>
+      </div>
+
+      <div className="columns-2 md:columns-3 lg:columns-4 gap-4 md:gap-6 space-y-4 md:space-y-6">
+        {visibleImages.map((img, idx) => (
+          <motion.div
+            key={`${category.id}-${idx}`}
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+            className={`relative group cursor-pointer overflow-hidden rounded-2xl md:rounded-3xl bg-brand-white shadow-sm border border-brand-black/5 break-inside-avoid`}
+            onClick={() => onImageClick(img.src, category.label)}
+          >
+            <ImageWithSkeleton 
+              src={img.src} 
+              alt={`${category.label} Image ${idx + 1}`} 
+              loading="lazy"
+              className="w-full h-auto object-cover transition-transform duration-1000 group-hover:scale-105"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute inset-0 bg-brand-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-700 flex items-center justify-center backdrop-blur-[2px]">
+              <div className="w-12 h-12 rounded-full bg-brand-white/20 backdrop-blur-md flex items-center justify-center border border-brand-white/30 scale-75 group-hover:scale-100 transition-transform duration-500">
+                <div className="w-4 h-4 text-brand-white flex items-center justify-center">
+                  <Play className="w-4 h-4 fill-brand-white rotate-90" />
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {images.length > 4 && (
+        <div className="mt-12 flex justify-center">
+          <button 
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="group flex flex-col items-center space-y-3"
+          >
+            <span className="text-[10px] uppercase tracking-[0.3em] font-bold text-brand-black/40 group-hover:text-brand-black transition-colors">
+              {isExpanded ? 'Show Less' : 'Show More'}
+            </span>
+            <div className="w-12 h-12 rounded-full border border-brand-black/10 flex items-center justify-center group-hover:bg-brand-black group-hover:border-brand-black transition-all duration-500 overflow-hidden relative">
+              <motion.div
+                animate={{ y: isExpanded ? -24 : 0 }}
+                className="flex flex-col items-center space-y-4"
+              >
+                 <ChevronRight className="w-4 h-4 rotate-90" />
+                 <ChevronRight className="w-4 h-4 -rotate-90 text-brand-white" />
+              </motion.div>
+            </div>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const Skeleton = ({ className }: { className?: string }) => (
   <div className={`animate-pulse bg-brand-gray relative overflow-hidden ${className}`}>
@@ -214,7 +358,6 @@ export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
   const [currentFeatureIndex, setCurrentFeatureIndex] = useState(0);
   const featuresRef = useRef<HTMLDivElement>(null);
@@ -222,7 +365,6 @@ export default function App() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [monthlyRent, setMonthlyRent] = useState<number | null>(null);
   const [outdoorImage, setOutdoorImage] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
 
   // Form state
   const [formState, setFormState] = useState({ 
@@ -281,6 +423,25 @@ export default function App() {
   };
 
   useEffect(() => {
+    // Visitor detection logic
+    const trackVisit = async () => {
+      const hasVisited = sessionStorage.getItem('ajmeri_ivory_visited');
+      if (!hasVisited) {
+        const statsRef = doc(db, 'stats', 'visits');
+        try {
+          await setDoc(statsRef, {
+            visitorCount: increment(1)
+          }, { merge: true });
+          sessionStorage.setItem('ajmeri_ivory_visited', 'true');
+        } catch (error) {
+          console.error('Error tracking visit:', error);
+        }
+      }
+    };
+    trackVisit();
+  }, []);
+
+  useEffect(() => {
     // Listen for rent and settings updates
     const unsub = onSnapshot(doc(db, 'settings', 'global'), (doc) => {
       if (doc.exists()) {
@@ -292,16 +453,44 @@ export default function App() {
     return unsub;
   }, []);
 
+  const [allGalleryImages, setAllGalleryImages] = useState<{ src: string, label: string }[]>([]);
+  const [galleryImagesLoaded, setGalleryImagesLoaded] = useState(false);
+
+  useEffect(() => {
+    const loadAllImages = async () => {
+      const all: { src: string, label: string }[] = [];
+      
+      const promises = COLLECTION_CATALOG.map(cat => {
+        return Array.from({ length: 15 }, (_, i) => {
+          const src = `${STORAGE_BASE_URL}/${cat.id}/${String(i + 1).padStart(2, '0')}.jpg`;
+          return new Promise<{ src: string, label: string } | null>((resolve) => {
+            const img = new Image();
+            img.src = src;
+            img.onload = () => resolve({ src, label: cat.label });
+            img.onerror = () => resolve(null);
+          });
+        });
+      }).flat();
+
+      const results = await Promise.all(promises);
+      const filtered = results.filter((img): img is { src: string, label: string } => img !== null);
+      setAllGalleryImages(filtered);
+      setGalleryImagesLoaded(true);
+    };
+
+    loadAllImages();
+  }, []);
+
   const nextImage = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (galleryIndex === null) return;
-    setGalleryIndex((prev) => (prev !== null ? (prev + 1) % HERO_IMAGES.length : 0));
+    setGalleryIndex((prev) => (prev !== null ? (prev + 1) % allGalleryImages.length : 0));
   };
 
   const prevImage = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (galleryIndex === null) return;
-    setGalleryIndex((prev) => (prev !== null ? (prev - 1 + HERO_IMAGES.length) % HERO_IMAGES.length : 0));
+    setGalleryIndex((prev) => (prev !== null ? (prev - 1 + allGalleryImages.length) % allGalleryImages.length : 0));
   };
 
   useEffect(() => {
@@ -386,17 +575,6 @@ export default function App() {
       });
     }
   }, [currentFeatureIndex]);
-
-  const handleVideoPlay = () => {
-    if (videoRef.current) {
-      if (isVideoPlaying) {
-        videoRef.current.pause();
-      } else {
-        videoRef.current.play();
-      }
-      setIsVideoPlaying(!isVideoPlaying);
-    }
-  };
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -684,11 +862,22 @@ export default function App() {
                 transition={{ delay: idx * 0.05 }}
                 className="bg-brand-white p-4 md:p-6 rounded-[24px] md:rounded-[32px] border border-brand-black/5 flex flex-col items-center text-center group hover:bg-brand-black transition-all duration-500"
               >
-                <div className="mb-3 md:mb-4 p-2.5 md:p-3 bg-brand-gray rounded-full group-hover:bg-brand-white/10 group-hover:text-brand-white transition-colors relative">
-                  <div className="scale-90 md:scale-100">
-                    {landmark.icon}
+                <div className="mb-3 md:mb-4 w-full aspect-[4/3] rounded-2xl overflow-hidden group-hover:scale-[1.02] transition-transform duration-500 relative bg-brand-gray">
+                  {landmark.image ? (
+                    <img 
+                      src={landmark.image} 
+                      alt={landmark.name}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-brand-black/20">
+                      {landmark.icon}
+                    </div>
+                  )}
+                  <div className="absolute top-2 right-2 p-1.5 bg-brand-white/80 backdrop-blur-sm rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ExternalLink className="w-3 h-3 text-brand-black" />
                   </div>
-                  <ExternalLink className="absolute -top-1 -right-1 w-2.5 h-2.5 md:w-3 md:h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
                 <p className="hidden md:block text-[10px] uppercase tracking-widest font-bold text-brand-black/20 mb-1 group-hover:text-brand-white/40">{landmark.category}</p>
                 <h3 className="text-[10px] md:text-xs font-bold text-brand-black group-hover:text-brand-white mb-1 md:mb-2 leading-tight line-clamp-2 md:line-clamp-none">{landmark.name}</h3>
@@ -780,39 +969,147 @@ export default function App() {
       </section>
 
       {/* Gallery Section */}
-      <section id="gallery" className="py-8 md:py-16 bg-brand-gray">
+      <section id="gallery" className="py-12 md:py-24 bg-brand-gray overflow-hidden">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="mb-10 md:mb-16">
-            <p className="text-xs uppercase tracking-widest text-brand-black/40 mb-4">Visual Tour</p>
-            <h2 className="text-4xl font-serif italic">The Collection</h2>
+          <div className="mb-12 md:mb-20 text-center md:text-left">
+            <p className="text-xs uppercase tracking-[0.3em] text-brand-black/30 mb-4 font-bold">Comprehensive Tour</p>
+            <h2 className="text-4xl md:text-7xl font-serif italic mb-6">The <span className="not-italic">Collection</span></h2>
+            <div className="h-[1px] w-24 bg-brand-black/10 mx-auto md:mx-0" />
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {HERO_IMAGES.map((img, idx) => (
-              <motion.div
-                key={idx}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: (idx % 8) * 0.05 }}
-                className="relative aspect-[4/3] group cursor-pointer overflow-hidden rounded-xl bg-brand-gray"
-                onClick={() => setGalleryIndex(idx)}
-              >
-                <ImageWithSkeleton 
-                  src={img.src} 
-                  fallback={img.fallback}
-                  alt={`Flat Image ${idx + 1}`} 
-                  loading="lazy"
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="absolute inset-0 bg-brand-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-center justify-center">
-                  <span className="text-brand-white text-[10px] uppercase tracking-widest font-medium border border-brand-white/30 px-4 py-1.5 rounded-full">
-                    Enlarge
-                  </span>
-                </div>
-              </motion.div>
+          <div className="space-y-24 md:space-y-32">
+            {COLLECTION_CATALOG.map((category) => (
+              <CollectionSection 
+                key={category.id} 
+                category={category} 
+                onImageClick={(src, label) => {
+                  const globalIdx = allGalleryImages.findIndex(ai => ai.src === src);
+                  if (globalIdx !== -1) {
+                    setGalleryIndex(globalIdx);
+                  } else {
+                    // If not in global list yet, add temporarily for modal
+                    setAllGalleryImages(prev => [...prev, { src, label }]);
+                    setGalleryIndex(allGalleryImages.length);
+                  }
+                }}
+              />
             ))}
+          </div>
+        </div>
+
+        {/* Cinematic Stream Gallery - Clustered Layout */}
+        <div className="mt-32 md:mt-48 relative">
+          <div className="mb-16 text-center">
+             <h3 className="text-2xl md:text-5xl font-serif italic mb-4">Cinematic Stream</h3>
+             <p className="text-[10px] md:text-xs uppercase tracking-[0.6em] text-brand-black/20 font-bold">A continuous visual narrative</p>
+          </div>
+          
+          <div className="flex overflow-hidden relative bg-brand-gray py-20">
+            <motion.div 
+              className="flex items-center space-x-[-15vw] whitespace-nowrap"
+              animate={{ x: [0, "-50%"] }}
+              transition={{ 
+                duration: 200, 
+                repeat: Infinity, 
+                ease: "linear"
+              }}
+            >
+              {[...Array(24)].map((_, idx) => {
+                const groupIdx = idx % 12; // 12 distinct groups, then repeat for seamless loop
+                const sourceArray = HERO_IMAGES;
+                const startIndex = (groupIdx * 6) % sourceArray.length;
+                const group = sourceArray.slice(startIndex, startIndex + 6);
+                if (group.length < 6) return null;
+                
+                return (
+                  <div key={idx} className="flex items-center space-x-[-18vw] px-0">
+                    {/* Sub-cluster 1 */}
+                    <div className="flex flex-col space-y-[-6vw] translate-y-[-10%] relative z-10">
+                      <motion.div 
+                        whileHover={{ scale: 1.1, zIndex: 50 }}
+                        className="w-[18vw] aspect-[4/3] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden border-[6px] md:border-[12px] border-brand-white shadow-[0_20px_50px_rgba(0,0,0,0.2)] bg-brand-gray cursor-pointer rotate-[-2deg]"
+                        onClick={() => {
+                          const src = group[0]?.src;
+                          if (!src) return;
+                          const globalIdx = allGalleryImages.findIndex(ai => ai.src === src);
+                          if (globalIdx !== -1) setGalleryIndex(globalIdx);
+                        }}
+                      >
+                        <img src={group[0].src} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      </motion.div>
+                      <motion.div 
+                        whileHover={{ scale: 1.1, zIndex: 50 }}
+                        className="w-[14vw] aspect-square rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden border-[6px] md:border-[12px] border-brand-white shadow-[0_20px_50px_rgba(0,0,0,0.2)] bg-brand-gray translate-x-[40%] cursor-pointer rotate-[3deg]"
+                        onClick={() => {
+                          const src = group[1]?.src;
+                          if (!src) return;
+                          const globalIdx = allGalleryImages.findIndex(ai => ai.src === src);
+                          if (globalIdx !== -1) setGalleryIndex(globalIdx);
+                        }}
+                      >
+                        <img src={group[1].src} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      </motion.div>
+                    </div>
+
+                    {/* Main Focus */}
+                    <motion.div 
+                      whileHover={{ scale: 1.05, zIndex: 60 }}
+                      className="w-[28vw] aspect-video rounded-[2rem] md:rounded-[3.5rem] overflow-hidden border-[8px] md:border-[16px] border-brand-white shadow-[0_40px_80px_rgba(0,0,0,0.4)] bg-brand-gray relative z-30 translate-y-[5%] cursor-pointer"
+                      onClick={() => {
+                        const src = group[2]?.src;
+                        if (!src) return;
+                        const globalIdx = allGalleryImages.findIndex(ai => ai.src === src);
+                        if (globalIdx !== -1) setGalleryIndex(globalIdx);
+                      }}
+                    >
+                      <img src={group[2].src} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    </motion.div>
+
+                    {/* Sub-cluster 2 */}
+                    <div className="flex flex-col space-y-6 md:space-y-12 translate-y-[15%] translate-x-[-10%] relative z-20">
+                      <motion.div 
+                        whileHover={{ scale: 1.1, zIndex: 50 }}
+                        className="w-[15vw] aspect-[3/4] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden border-[6px] md:border-[12px] border-brand-white shadow-[0_20px_50px_rgba(0,0,0,0.2)] bg-brand-gray cursor-pointer rotate-[1deg]"
+                        onClick={() => {
+                          const src = group[3]?.src;
+                          if (!src) return;
+                          const globalIdx = allGalleryImages.findIndex(ai => ai.src === src);
+                          if (globalIdx !== -1) setGalleryIndex(globalIdx);
+                        }}
+                      >
+                        <img src={group[3].src} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      </motion.div>
+                      <motion.div 
+                        whileHover={{ scale: 1.1, zIndex: 50 }}
+                        className="w-[20vw] aspect-[16/10] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden border-[6px] md:border-[12px] border-brand-white shadow-[0_20px_50px_rgba(0,0,0,0.2)] bg-brand-gray translate-x-[-20%] cursor-pointer rotate-[-1deg]"
+                        onClick={() => {
+                          const src = group[4]?.src;
+                          if (!src) return;
+                          const globalIdx = allGalleryImages.findIndex(ai => ai.src === src);
+                          if (globalIdx !== -1) setGalleryIndex(globalIdx);
+                        }}
+                      >
+                        <img src={group[4].src} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      </motion.div>
+                    </div>
+
+                    {/* Floating Detail */}
+                    <motion.div 
+                      whileHover={{ scale: 1.1, zIndex: 50 }}
+                      className="w-[12vw] aspect-square rounded-[1.5rem] md:rounded-[2rem] overflow-hidden border-[6px] md:border-[10px] border-brand-white shadow-[0_15px_40px_rgba(0,0,0,0.15)] bg-brand-gray relative z-0 translate-y-[-25%] translate-x-[-50%] cursor-pointer rotate-[5deg]"
+                      onClick={() => {
+                        const src = group[5]?.src;
+                        if (!src) return;
+                        const globalIdx = allGalleryImages.findIndex(ai => ai.src === src);
+                        if (globalIdx !== -1) setGalleryIndex(globalIdx);
+                      }}
+                    >
+                      <img src={group[5].src} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    </motion.div>
+                  </div>
+                );
+              })}
+            </motion.div>
           </div>
         </div>
       </section>
@@ -868,31 +1165,15 @@ export default function App() {
             initial={{ opacity: 0, scale: 0.95 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
-            className="relative aspect-video rounded-3xl overflow-hidden shadow-2xl group"
+            className="relative aspect-video rounded-3xl overflow-hidden shadow-2xl bg-brand-black"
           >
-            <video 
-              ref={videoRef}
-              className="w-full h-full object-cover"
-              poster={`${STORAGE_BASE_URL}/video/thumbnail.jpg`}
-              controls={isVideoPlaying}
-              onPlay={() => setIsVideoPlaying(true)}
-              onPause={() => setIsVideoPlaying(false)}
-            >
-              <source src={`${STORAGE_BASE_URL}/video/tour.mp4`} type="video/mp4" />
-              <source src="https://assets.mixkit.co/videos/preview/mixkit-modern-apartment-interior-design-4328-large.mp4" type="video/mp4" />
-              Your browser does not support the video tag.
-            </video>
-            
-            {!isVideoPlaying && (
-              <div 
-                className="absolute inset-0 bg-brand-black/30 flex items-center justify-center cursor-pointer group-hover:bg-brand-black/40 transition-colors"
-                onClick={handleVideoPlay}
-              >
-                <div className="w-24 h-24 rounded-full bg-brand-white/20 backdrop-blur-md flex items-center justify-center border border-brand-white/30 group-hover:scale-110 transition-transform">
-                  <Play className="w-10 h-10 text-brand-white fill-brand-white" />
-                </div>
-              </div>
-            )}
+            <iframe 
+              src="https://www.youtube.com/embed/jOSTNL9dUmU?autoplay=0&rel=0" 
+              title="Ajmeri Ivory Tour"
+              className="w-full h-full border-0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+              allowFullScreen
+            />
           </motion.div>
         </div>
       </section>
@@ -1157,20 +1438,20 @@ export default function App() {
       </section>
 
       {/* Footer */}
-      <footer className="py-24 px-6 border-t border-brand-black/5 bg-brand-gray">
+      <footer className="py-12 md:py-16 px-6 border-t border-brand-black/5 bg-brand-gray">
         <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-12 mb-24">
+          <div className="grid md:grid-cols-4 gap-8 mb-12">
             <div className="col-span-2">
-              <div className="text-2xl font-serif font-bold tracking-tight mb-6">
+              <div className="text-xl font-serif font-bold tracking-tight mb-4">
                 AJMERI<span className="font-light italic ml-6">Ivory</span>
               </div>
-              <p className="text-brand-black/60 max-w-sm leading-relaxed">
+              <p className="text-brand-black/60 max-w-sm leading-relaxed text-sm">
                 Elevating the standard of urban living at AJMERI IVORY through intentional design and uncompromising quality.
               </p>
             </div>
             <div>
-              <h4 className="text-xs uppercase tracking-widest font-bold mb-6">Address</h4>
-              <p className="text-brand-black/60 text-sm leading-relaxed max-w-[200px]">
+              <h4 className="text-[10px] uppercase tracking-widest font-bold mb-4">Address</h4>
+              <p className="text-brand-black/60 text-xs leading-relaxed max-w-[200px]">
                 AJMERI IVORY,<br />
                 House-7P & 7Q (5th floor),<br />
                 Abdus Sadek Sarak,<br />
@@ -1178,28 +1459,18 @@ export default function App() {
               </p>
             </div>
             <div>
-              <h4 className="text-xs uppercase tracking-widest font-bold mb-6">Proximity</h4>
-              <ul className="space-y-4 text-sm text-brand-black/60">
-                <li><a href="#location" className="hover:text-brand-black transition-colors">Evercare Hospital</a></li>
-                <li><a href="#location" className="hover:text-brand-black transition-colors">Jamuna Future Park</a></li>
-                <li><a href="#location" className="hover:text-brand-black transition-colors">ICCB & 300 Feet Rd</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-xs uppercase tracking-widest font-bold mb-6">Contact</h4>
-              <ul className="space-y-4 text-sm text-brand-black/60">
+              <h4 className="text-[10px] uppercase tracking-widest font-bold mb-4">Contact</h4>
+              <ul className="space-y-2 text-xs text-brand-black/60">
                 <li><a href="mailto:islam.hive@yahoo.com" className="hover:text-brand-black transition-colors">islam.hive@yahoo.com</a></li>
                 <li><a href="tel:01767842000" className="hover:text-brand-black transition-colors">01767842000</a></li>
               </ul>
             </div>
           </div>
           
-          <div className="pt-12 border-t border-brand-black/5 flex flex-col md:flex-row justify-between items-center text-xs uppercase tracking-widest text-brand-black/40 space-y-4 md:space-y-0">
+          <div className="pt-8 border-t border-brand-black/5 flex flex-col md:flex-row justify-between items-center text-[10px] uppercase tracking-widest text-brand-black/40 space-y-4 md:space-y-0">
             <p>© 2026 sabbir islam alvi. All rights reserved.</p>
             <div className="flex space-x-8">
               <button onClick={() => setIsAdminOpen(true)} className="hover:text-brand-black transition-colors">Admin Portal</button>
-              <a href="#" className="hover:text-brand-black transition-colors">Instagram</a>
-              <a href="#" className="hover:text-brand-black transition-colors">LinkedIn</a>
             </div>
           </div>
         </div>
@@ -1287,8 +1558,7 @@ export default function App() {
                   className="w-full flex justify-center touch-none"
                 >
                   <ImageWithSkeleton 
-                    src={HERO_IMAGES[galleryIndex].src} 
-                    fallback={HERO_IMAGES[galleryIndex].fallback}
+                    src={allGalleryImages[galleryIndex]?.src || ""} 
                     alt="Full view" 
                     className="max-h-[70vh] md:max-h-[80vh] w-full object-contain rounded-lg shadow-2xl select-none pointer-events-none"
                     referrerPolicy="no-referrer"
@@ -1302,8 +1572,8 @@ export default function App() {
                 animate={{ opacity: 1, y: 0 }}
                 className="text-center px-6"
               >
-                <p className="text-brand-white text-lg font-serif italic">{HERO_IMAGES[galleryIndex].caption}</p>
-                <p className="text-brand-white/40 text-[10px] uppercase tracking-widest mt-2">{galleryIndex + 1} / {HERO_IMAGES.length}</p>
+                <p className="text-brand-white text-lg font-serif italic">{allGalleryImages[galleryIndex]?.label}</p>
+                <p className="text-brand-white/40 text-[10px] uppercase tracking-widest mt-2">{galleryIndex + 1} / {allGalleryImages.length}</p>
               </motion.div>
             </div>
           </motion.div>

@@ -40,7 +40,10 @@ import {
   Navigation,
   School,
   ShoppingBag,
-  ExternalLink
+  ExternalLink,
+  Cctv,
+  Zap,
+  Snowflake
 } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 import { db, auth, handleFirestoreError } from './lib/firebase';
@@ -58,12 +61,13 @@ const AMENITIES = [
   { icon: <Car className="w-5 h-5" />, label: "1 Dedicated Car Parking" },
   { icon: <Users className="w-5 h-5" />, label: "2 Spacious Elevators" },
   { icon: <ShieldCheck className="w-5 h-5" />, label: "24/7 Security" },
-  { icon: <Wind className="w-5 h-5" />, label: "Genarator support" },
-  { icon: <Wind className="w-5 h-5" />, label: "1 AC Provided" },
+  { icon: <Zap className="w-5 h-5" />, label: "Generator Support" },
+  { icon: <Snowflake className="w-5 h-5" />, label: "1 AC Provided" },
   { icon: <Lock className="w-5 h-5" />, label: "Smart Door Lock" },
   { icon: <Fan className="w-5 h-5" />, label: "Premium Ceiling Fans" },
   { icon: <Lightbulb className="w-5 h-5" />, label: "Decorative Lighting" },
   { icon: <Home className="w-5 h-5" />, label: "4 Spacious Bedrooms" },
+  { icon: <Cctv className="w-5 h-5" />, label: "CCTV Camera" },
 ];
 
 const LANDMARKS = [
@@ -250,7 +254,7 @@ const CollectionSection = ({
 
   return (
     <div className="relative">
-      <div className="flex items-end justify-between mb-8 md:mb-12 px-2">
+      <div className="flex items-end justify-between mb-6 md:mb-12 px-2">
         <div>
           <h3 className="text-2xl md:text-4xl font-serif mb-2">{category.label}</h3>
           <p className="text-[10px] uppercase tracking-widest text-brand-black/40 font-bold">{images.length} Images in Collection</p>
@@ -287,7 +291,7 @@ const CollectionSection = ({
       </div>
 
       {images.length > 4 && (
-        <div className="mt-12 flex justify-center">
+        <div className="mt-8 flex justify-center">
           <button 
             onClick={() => setIsExpanded(!isExpanded)}
             className="group flex flex-col items-center space-y-3"
@@ -740,7 +744,7 @@ export default function App() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 1.5, ease: "easeOut" }}
-            className="text-4xl md:text-[10rem] font-serif italic mb-6 md:mb-12 leading-[1.1] md:leading-[0.95] tracking-tighter"
+            className="text-4xl md:text-[10rem] font-serif italic mb-4 md:mb-12 leading-[1.1] md:leading-[0.95] tracking-tighter"
           >
             Ajmeri <br /> Ivory
           </motion.h1>
@@ -749,7 +753,7 @@ export default function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 1.2, duration: 1 }}
-            className="mb-10 md:mb-0"
+            className="mb-8 md:mb-0"
           >
             <a 
               href="#gallery"
@@ -859,7 +863,7 @@ export default function App() {
       {/* Nearby Landmarks Section */}
       <section className="py-8 md:py-16 px-6 bg-brand-gray/30">
         <div className="max-w-7xl mx-auto">
-          <div className="mb-10 md:mb-16">
+          <div className="mb-6 md:mb-16">
             <p className="text-xs uppercase tracking-widest text-brand-black/40 mb-4">Prime Location</p>
             <h2 className="text-4xl md:text-5xl font-serif italic">Connected <span className="not-italic">Convenience</span></h2>
           </div>
@@ -909,7 +913,7 @@ export default function App() {
       {/* Residence Features Grid */}
       <section className="py-8 md:py-16 px-6 bg-brand-white overflow-hidden">
         <div className="max-w-7xl mx-auto">
-          <div className="mb-10 md:mb-16 flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-8">
+          <div className="mb-6 md:mb-16 flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-8">
             <div className="max-w-2xl">
               <p className="text-xs uppercase tracking-widest text-brand-black/40 mb-4">Interior Excellence</p>
               <h2 className="text-4xl md:text-6xl font-serif italic leading-[1.1]">Sophisticated <br /> <span className="not-italic">Craftsmanship</span></h2>
@@ -951,10 +955,6 @@ export default function App() {
                   <h3 className="text-lg md:text-2xl font-serif mb-4 md:mb-6 group-hover:text-brand-white transition-colors">{feature.title}</h3>
                   <p className="text-xs md:text-sm leading-relaxed mb-6 group-hover:text-brand-white/70 transition-colors">{feature.description}</p>
                 </div>
-                <div className="pt-6 border-t border-brand-black/5 group-hover:border-brand-white/10">
-                  <p className="text-[9px] md:text-[10px] uppercase tracking-widest font-bold mb-2 group-hover:text-brand-white/40">Key Highlights</p>
-                  <p className="text-[11px] md:text-xs italic leading-relaxed group-hover:text-brand-white/60">{feature.details}</p>
-                </div>
               </motion.div>
             ))}
           </div>
@@ -984,15 +984,15 @@ export default function App() {
       </section>
 
       {/* Gallery Section */}
-      <section id="gallery" className="py-12 md:py-24 bg-brand-gray overflow-hidden">
+      <section id="gallery" className="py-8 md:py-24 bg-brand-gray overflow-hidden">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="mb-12 md:mb-20 text-center md:text-left">
+          <div className="mb-8 md:mb-20 text-center md:text-left">
             <p className="text-xs uppercase tracking-[0.3em] text-brand-black/30 mb-4 font-bold">Comprehensive Tour</p>
             <h2 className="text-4xl md:text-7xl font-serif italic mb-6">The <span className="not-italic">Collection</span></h2>
             <div className="h-[1px] w-24 bg-brand-black/10 mx-auto md:mx-0" />
           </div>
 
-          <div className="space-y-24 md:space-y-32">
+          <div className="space-y-12 md:space-y-32">
             {COLLECTION_CATALOG.map((category) => (
               <CollectionSection 
                 key={category.id} 
@@ -1013,7 +1013,7 @@ export default function App() {
         </div>
 
         {/* The Gallery Collective - Visual Log */}
-        <div id="gallery" className="mt-32 md:mt-48 relative px-4 md:px-12">
+        <div id="gallery" className="mt-12 md:mt-48 relative px-4 md:px-12">
           <div className="mb-16 text-center max-w-2xl mx-auto">
              <h3 className="text-3xl md:text-6xl font-serif italic mb-4">The Gallery Collective</h3>
              <p className="text-[10px] md:text-sm uppercase tracking-[0.5em] text-brand-black/40 font-bold mb-8">A curated collection of 35 unique architectural perspectives</p>
@@ -1120,7 +1120,7 @@ export default function App() {
       {/* Amenities Section */}
       <section id="amenities" className="py-8 md:py-16 px-6 bg-brand-white">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-10 md:mb-16">
+          <div className="text-center mb-6 md:mb-16">
             <p className="text-xs uppercase tracking-widest text-brand-black/40 mb-4">Comforts</p>
             <h2 className="text-4xl md:text-5xl font-serif">Premium Amenities</h2>
           </div>
@@ -1160,7 +1160,7 @@ export default function App() {
       {/* Video Section */}
       <section id="video" className="relative py-8 md:py-16 overflow-hidden bg-brand-gray">
         <div className="max-w-5xl mx-auto px-6">
-          <div className="text-center mb-8 md:mb-10">
+          <div className="text-center mb-6 md:mb-10">
             <p className="text-xs uppercase tracking-widest text-brand-black/40 mb-4">Cinematic Tour</p>
             <h2 className="text-4xl font-serif italic">Experience the Flow</h2>
           </div>
@@ -1193,7 +1193,7 @@ export default function App() {
                   <MapPin className="w-6 h-6 text-brand-white/40 mt-1" />
                   <div>
                     <h4 className="font-medium text-lg mb-2 text-brand-white">AJMERI IVORY, Block-D, Bashundhara R/A</h4>
-                    <p className="text-brand-white/60 font-serif italic">House-7P & 7Q, Abdus Sadek Sarak</p>
+                    <p className="text-brand-white/60 font-sans">House-7P & 7Q, Abdus Sadek Sarak</p>
                   </div>
                 </div>
                 <p className="text-brand-white/60 leading-relaxed">
@@ -1242,7 +1242,7 @@ export default function App() {
       {/* Contact/Application Section */}
       <section id="contact" className="py-8 md:py-16 bg-brand-white">
         <div className="max-w-4xl mx-auto px-6">
-          <div className="text-center mb-10 md:mb-16">
+          <div className="text-center mb-6 md:mb-16">
             <p className="text-xs uppercase tracking-widest text-brand-black/40 mb-4">Rental Application</p>
             <h2 className="text-4xl md:text-5xl font-serif italic mb-6">Show Your Interest</h2>
             <p className="text-brand-black/60 max-w-lg mx-auto leading-relaxed text-sm md:text-base">
@@ -1454,7 +1454,7 @@ export default function App() {
             </div>
             <div>
               <h4 className="text-[10px] uppercase tracking-widest font-bold mb-4">Address</h4>
-              <p className="text-brand-black/60 text-xs leading-relaxed max-w-[200px]">
+              <p className="text-brand-black/60 text-xs leading-relaxed max-w-[200px] font-sans">
                 AJMERI IVORY,<br />
                 House-7P & 7Q (5th floor),<br />
                 Abdus Sadek Sarak,<br />

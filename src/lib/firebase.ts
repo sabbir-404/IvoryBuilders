@@ -1,11 +1,40 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer, FirestoreError } from 'firebase/firestore';
+import { 
+  initializeFirestore,
+  doc, 
+  getDocFromServer, 
+  FirestoreError, 
+  enableIndexedDbPersistence,
+  setLogLevel,
+  CACHE_SIZE_UNLIMITED
+} from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
+// Reduce noise from SDK regarding temporary connectivity issues
+setLogLevel('error');
+
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+// Using initializeFirestore instead of getFirestore to provide experimental settings
+// experimentalAutoDetectLongPolling helps in environments where WebSockets are flaky
+export const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true,
+  cacheSizeBytes: CACHE_SIZE_UNLIMITED
+}, firebaseConfig.firestoreDatabaseId);
+
 export const auth = getAuth(app);
+
+// Enable offline persistence for a smoother experience
+if (typeof window !== 'undefined') {
+  enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code === 'failed-precondition') {
+      console.warn('Firestore persistence failed: Multiple tabs open');
+    } else if (err.code === 'unimplemented') {
+      console.warn('Firestore persistence is not supported in this browser');
+    }
+  });
+}
 
 export interface FirestoreErrorInfo {
   error: string;

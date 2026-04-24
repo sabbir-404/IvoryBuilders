@@ -125,39 +125,39 @@ const LANDMARKS = [
 const RESIDENCE_FEATURES = [
   {
     icon: <Sofa className="w-5 h-5 md:w-6 md:h-6" />,
-    title: "Formal Living & Foyer",
-    description: "Elegantly designed with modern interior finishes, featuring curated hanging gardens and abundant natural daylight.",
-    details: "Premium ceiling fans, decorative lighting, and a warm, welcoming ambiance."
+    title: "Formal Living Room (Including Foyer)",
+    description: "Elegantly designed with modern interior finishes, the formal living space features refined decorative lighting, premium ceiling fans, a curated hanging garden, and abundant natural daylight, creating a warm and welcoming ambiance.",
+    details: "Refined decorative lighting, premium ceiling fans, curated hanging garden."
   },
   {
     icon: <ChefHat className="w-5 h-5 md:w-6 md:h-6" />,
-    title: "Contemporary Kitchen",
-    description: "Fully functional with high-quality cabinetry, grocer organizer, and stylish breakfast counter.",
-    details: "Premium kitchen hood, marble countertops, and hot water supply."
+    title: "Kitchen with Attached Balcony",
+    description: "A contemporary, fully functional kitchen equipped with high-quality cabinetry, a dedicated groceries organizer, premium kitchen hood, exhaust system, and sink with hot water supply. The space includes provision for a water purifier, sleek marble countertops, and a stylish breakfast counter, all complemented by ample natural light and an attached utility balcony.",
+    details: "High-quality cabinetry, kitchen hood, water purifier provision, breakfast counter."
+  },
+  {
+    icon: <Utensils className="w-5 h-5 md:w-6 md:h-6" />,
+    title: "Dining Area",
+    description: "Thoughtfully designed with modern aesthetics, the dining space is enhanced with decorative lighting, a ceiling fan, and generous natural daylight, offering a comfortable and elegant setting for family dining.",
+    details: "Decorative lighting, ceiling fan, generous natural daylight."
   },
   {
     icon: <Monitor className="w-5 h-5 md:w-6 md:h-6" />,
     title: "Family Living Area",
-    description: "Cozy lounge with custom TV cabinet and workstation setup, ideal for everyday relaxation.",
-    details: "High-speed connectivity, decorative lighting, and large windows."
+    description: "A cozy yet sophisticated family lounge featuring modern interior elements, decorative lighting, ceiling fans, a custom TV cabinet, and internet connectivity setup, with plenty of natural daylight for a relaxed everyday living experience.",
+    details: "Custom TV cabinet, internet connectivity, plenty of natural daylight."
   },
   {
     icon: <Bed className="w-5 h-5 md:w-6 md:h-6" />,
-    title: "Master Suite & Bedrooms",
-    description: "Appointed with walk-in closets, workstations, and private balconies with cloth drying rails.",
-    details: "Master bedroom includes air cooler and night lamps for ultimate comfort."
+    title: "Bedrooms",
+    description: "Beautifully appointed bedrooms featuring modern interior finishes, decorative lighting, night lamps, and ceiling fans. The master bedroom includes an air cooler for added comfort. Each room offers a workstation-cum-dressing unit, a spacious walk-in closet with a large mirror, and a private balcony. All balconies are equipped with cloth drying rails for convenience.",
+    details: "Workstation-cum-dressing unit, walk-in closet, private balcony with drying rails."
   },
   {
     icon: <Bath className="w-5 h-5 md:w-6 md:h-6" />,
-    title: "Modern Bathrooms",
-    description: "Imported sanitary fittings and TOTO wall-hung WCs with glass-enclosed shower areas.",
-    details: "Hot water supply across all units, plus a dedicated separate maid's bathroom."
-  },
-  {
-    icon: <Utensils className="w-5 h-5 md:w-6 md:h-6" />,
-    title: "Dining & Foyer",
-    description: "Refined dining space enhanced with modern aesthetics and generous natural daylight.",
-    details: "Comfortable setting for family dining with designer fixtures."
+    title: "Bathrooms",
+    description: "Well-appointed bathrooms with modern fittings and premium finishes. The master and second bedrooms include attached bathrooms, while bedrooms 3 and 4 share a common bathroom. Each bathroom is equipped with TOTO wall-hung WCs, imported sanitary fittings, hot water supply, and glass-enclosed shower areas. A separate maid’s bathroom is conveniently located adjacent to the kitchen balcony.",
+    details: "TOTO wall-hung WCs, imported sanitary fittings, hot water supply, glass shower areas."
   }
 ];
 
@@ -426,6 +426,18 @@ export default function App() {
       });
 
       setSubmitStatus('success');
+      
+      // Send email notification via backend
+      try {
+        await fetch('/api/notify-application', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formState)
+        });
+      } catch (err) {
+        console.error('Failed to trigger email notification:', err);
+      }
+
       setFormState({ 
         name: '', 
         email: '', 
@@ -659,7 +671,7 @@ export default function App() {
             <h2 className="text-4xl md:text-5xl font-serif italic">Connected <span className="not-italic">Convenience</span></h2>
           </div>
           
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-6">
             {LANDMARKS.map((landmark, idx) => (
               <motion.a
                 key={idx}
@@ -669,19 +681,20 @@ export default function App() {
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: idx * 0.1 }}
-                className="bg-brand-white p-6 rounded-[32px] border border-brand-black/5 flex flex-col items-center text-center group hover:bg-brand-black transition-all duration-500"
+                transition={{ delay: idx * 0.05 }}
+                className="bg-brand-white p-4 md:p-6 rounded-[24px] md:rounded-[32px] border border-brand-black/5 flex flex-col items-center text-center group hover:bg-brand-black transition-all duration-500"
               >
-                <div className="mb-4 p-3 bg-brand-gray rounded-full group-hover:bg-brand-white/10 group-hover:text-brand-white transition-colors relative">
-                  {landmark.icon}
-                  <ExternalLink className="absolute -top-1 -right-1 w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="mb-3 md:mb-4 p-2.5 md:p-3 bg-brand-gray rounded-full group-hover:bg-brand-white/10 group-hover:text-brand-white transition-colors relative">
+                  <div className="scale-90 md:scale-100">
+                    {landmark.icon}
+                  </div>
+                  <ExternalLink className="absolute -top-1 -right-1 w-2.5 h-2.5 md:w-3 md:h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
-                <p className="text-[10px] uppercase tracking-widest font-bold text-brand-black/20 mb-1 group-hover:text-brand-white/40">{landmark.category}</p>
-                <h3 className="text-xs font-bold text-brand-black group-hover:text-brand-white mb-2 leading-tight">{landmark.name}</h3>
-                <p className="text-[10px] leading-relaxed text-brand-black/50 group-hover:text-brand-white/60 mb-4 px-2 italic line-clamp-2">"{landmark.usp}"</p>
-                <div className="mt-auto pt-3 border-t border-brand-black/5 group-hover:border-brand-white/10 w-full">
-                  <p className="text-[10px] font-bold text-brand-black/60 group-hover:text-brand-white/80 mb-0.5">{landmark.distKm}</p>
-                  <p className="text-[10px] italic text-brand-black/40 group-hover:text-brand-white/40">~ {landmark.distance}</p>
+                <p className="hidden md:block text-[10px] uppercase tracking-widest font-bold text-brand-black/20 mb-1 group-hover:text-brand-white/40">{landmark.category}</p>
+                <h3 className="text-[10px] md:text-xs font-bold text-brand-black group-hover:text-brand-white mb-1 md:mb-2 leading-tight line-clamp-2 md:line-clamp-none">{landmark.name}</h3>
+                <div className="mt-auto pt-2 md:pt-3 border-t border-brand-black/5 group-hover:border-brand-white/10 w-full">
+                  <p className="text-[9px] md:text-[10px] font-bold text-brand-black/60 group-hover:text-brand-white/80">{landmark.distKm}</p>
+                  <p className="text-[9px] md:text-[10px] italic text-brand-black/40 group-hover:text-brand-white/40">~ {landmark.distance}</p>
                 </div>
               </motion.a>
             ))}
@@ -720,7 +733,7 @@ export default function App() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: idx * 0.1 }}
-                className="group p-8 md:p-10 bg-brand-gray/30 rounded-[32px] md:rounded-[40px] border border-brand-black/5 hover:bg-brand-black hover:text-brand-white transition-all duration-700 min-w-[85vw] md:min-w-0 snap-center flex flex-col justify-between"
+                className="group p-6 md:p-10 bg-brand-gray/30 rounded-[32px] md:rounded-[40px] border border-brand-black/5 hover:bg-brand-black hover:text-brand-white transition-all duration-700 min-w-[85vw] md:min-w-0 snap-center flex flex-col justify-between"
               >
                 <div>
                   <div className="mb-6 md:mb-8 flex items-center justify-between">
@@ -812,7 +825,7 @@ export default function App() {
             <h2 className="text-4xl md:text-5xl font-serif">Premium Amenities</h2>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-y-16 gap-x-8">
+          <div className="grid grid-cols-3 md:grid-cols-4 gap-y-10 md:gap-y-16 gap-x-4 md:gap-x-8">
             {AMENITIES.map((item, idx) => (
               <motion.div 
                 key={idx}
@@ -1182,7 +1195,7 @@ export default function App() {
           </div>
           
           <div className="pt-12 border-t border-brand-black/5 flex flex-col md:flex-row justify-between items-center text-xs uppercase tracking-widest text-brand-black/40 space-y-4 md:space-y-0">
-            <p>© 2026 Ajmeri Ivory. All rights reserved.</p>
+            <p>© 2026 sabbir islam alvi. All rights reserved.</p>
             <div className="flex space-x-8">
               <button onClick={() => setIsAdminOpen(true)} className="hover:text-brand-black transition-colors">Admin Portal</button>
               <a href="#" className="hover:text-brand-black transition-colors">Instagram</a>
@@ -1244,16 +1257,44 @@ export default function App() {
             </button>
 
             <div className="max-w-5xl w-full flex flex-col items-center space-y-6">
-              <div className="max-h-[70vh] md:max-h-[80vh] w-full" onClick={(e) => e.stopPropagation()}>
-                <ImageWithSkeleton 
+              <div 
+                className="max-h-[70vh] md:max-h-[80vh] w-full cursor-pointer relative group flex items-center justify-center" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  nextImage();
+                }}
+              >
+                <div className="absolute inset-x-0 bottom-4 z-20 flex justify-center md:hidden">
+                  <div className="bg-brand-black/40 backdrop-blur-md px-4 py-2 rounded-full text-[10px] text-brand-white/70 uppercase tracking-widest border border-brand-white/10">
+                    Swipe or Tap to slide
+                  </div>
+                </div>
+
+                <motion.div
                   key={galleryIndex}
-                  src={HERO_IMAGES[galleryIndex].src} 
-                  fallback={HERO_IMAGES[galleryIndex].fallback}
-                  alt="Full view" 
-                  className="max-h-[70vh] md:max-h-[80vh] w-full object-contain rounded-lg shadow-2xl"
-                  referrerPolicy="no-referrer"
-                  loading="eager"
-                />
+                  drag="x"
+                  dragConstraints={{ left: 0, right: 0 }}
+                  dragElastic={0.2}
+                  onDragEnd={(_, info) => {
+                    const threshold = 50;
+                    if (info.offset.x < -threshold) nextImage();
+                    else if (info.offset.x > threshold) prevImage();
+                  }}
+                  initial={{ opacity: 0, x: 20, scale: 0.95 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: -20, scale: 0.95 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  className="w-full flex justify-center touch-none"
+                >
+                  <ImageWithSkeleton 
+                    src={HERO_IMAGES[galleryIndex].src} 
+                    fallback={HERO_IMAGES[galleryIndex].fallback}
+                    alt="Full view" 
+                    className="max-h-[70vh] md:max-h-[80vh] w-full object-contain rounded-lg shadow-2xl select-none pointer-events-none"
+                    referrerPolicy="no-referrer"
+                    loading="eager"
+                  />
+                </motion.div>
               </div>
               <motion.div 
                 key={`caption-${galleryIndex}`}

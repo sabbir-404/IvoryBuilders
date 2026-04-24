@@ -43,7 +43,7 @@ import {
   ExternalLink
 } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
-import { db, auth } from './lib/firebase';
+import { db, auth, handleFirestoreError } from './lib/firebase';
 import { collection, addDoc, Timestamp, doc, onSnapshot, increment, updateDoc, setDoc, getDoc } from 'firebase/firestore';
 import AdminPanel from './AdminPanel';
 import { Toaster } from "@/components/ui/sonner";
@@ -358,6 +358,7 @@ export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
+  const [showAllImages, setShowAllImages] = useState(false);
   const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
   const [currentFeatureIndex, setCurrentFeatureIndex] = useState(0);
   const featuresRef = useRef<HTMLDivElement>(null);
@@ -434,7 +435,7 @@ export default function App() {
           }, { merge: true });
           sessionStorage.setItem('ajmeri_ivory_visited', 'true');
         } catch (error) {
-          console.error('Error tracking visit:', error);
+          console.warn('Silent analytics failure (Firestore may be offline):', error);
         }
       }
     };
@@ -449,6 +450,8 @@ export default function App() {
         setMonthlyRent(data.monthlyRent);
         setOutdoorImage(data.outdoorImage || null);
       }
+    }, (error) => {
+      console.warn("Firestore settings sync notice (app using defaults while offline):", error);
     });
     return unsub;
   }, []);
@@ -460,7 +463,12 @@ export default function App() {
     const loadAllImages = async () => {
       const all: { src: string, label: string }[] = [];
       
-      const promises = COLLECTION_CATALOG.map(cat => {
+      // First, add the hero collection (35 perspectives)
+      HERO_IMAGES.forEach((img, i) => {
+        all.push({ src: img.src, label: `Perspective ${i + 1}` });
+      });
+
+      const catPromises = COLLECTION_CATALOG.map(cat => {
         return Array.from({ length: 15 }, (_, i) => {
           const src = `${STORAGE_BASE_URL}/${cat.id}/${String(i + 1).padStart(2, '0')}.jpg`;
           return new Promise<{ src: string, label: string } | null>((resolve) => {
@@ -472,9 +480,9 @@ export default function App() {
         });
       }).flat();
 
-      const results = await Promise.all(promises);
+      const results = await Promise.all(catPromises);
       const filtered = results.filter((img): img is { src: string, label: string } => img !== null);
-      setAllGalleryImages(filtered);
+      setAllGalleryImages([...all, ...filtered]);
       setGalleryImagesLoaded(true);
     };
 
@@ -628,7 +636,14 @@ export default function App() {
     } catch (error) {
       console.error('Error submitting application:', error);
       setSubmitStatus('error');
-      toast.error("Failed to submit application.");
+      // Using helper for robust error info
+      try {
+        handleFirestoreError(error, 'create', 'applications');
+      } catch (err) {
+        // Log the JSON error as per guidelines
+        console.error("Firestore Security/Logic Error:", err);
+        toast.error("Security/Network error. Please try again later.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -997,119 +1012,107 @@ export default function App() {
           </div>
         </div>
 
-        {/* Cinematic Stream Gallery - Clustered Layout */}
-        <div className="mt-32 md:mt-48 relative">
-          <div className="mb-16 text-center">
-             <h3 className="text-2xl md:text-5xl font-serif italic mb-4">Cinematic Stream</h3>
-             <p className="text-[10px] md:text-xs uppercase tracking-[0.6em] text-brand-black/20 font-bold">A continuous visual narrative</p>
+        {/* The Gallery Collective - Visual Log */}
+        <div id="gallery" className="mt-32 md:mt-48 relative px-4 md:px-12">
+          <div className="mb-16 text-center max-w-2xl mx-auto">
+             <h3 className="text-3xl md:text-6xl font-serif italic mb-4">The Gallery Collective</h3>
+             <p className="text-[10px] md:text-sm uppercase tracking-[0.5em] text-brand-black/40 font-bold mb-8">A curated collection of 35 unique architectural perspectives</p>
+             <div className="h-px w-24 bg-brand-gold/30 mx-auto"></div>
           </div>
           
-          <div className="flex overflow-hidden relative bg-brand-gray py-20">
-            <motion.div 
-              className="flex items-center space-x-[-15vw] whitespace-nowrap"
-              animate={{ x: [0, "-50%"] }}
-              transition={{ 
-                duration: 200, 
-                repeat: Infinity, 
-                ease: "linear"
-              }}
-            >
-              {[...Array(24)].map((_, idx) => {
-                const groupIdx = idx % 12; // 12 distinct groups, then repeat for seamless loop
-                const sourceArray = HERO_IMAGES;
-                const startIndex = (groupIdx * 6) % sourceArray.length;
-                const group = sourceArray.slice(startIndex, startIndex + 6);
-                if (group.length < 6) return null;
-                
-                return (
-                  <div key={idx} className="flex items-center space-x-[-18vw] px-0">
-                    {/* Sub-cluster 1 */}
-                    <div className="flex flex-col space-y-[-6vw] translate-y-[-10%] relative z-10">
-                      <motion.div 
-                        whileHover={{ scale: 1.1, zIndex: 50 }}
-                        className="w-[18vw] aspect-[4/3] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden border-[6px] md:border-[12px] border-brand-white shadow-[0_20px_50px_rgba(0,0,0,0.2)] bg-brand-gray cursor-pointer rotate-[-2deg]"
-                        onClick={() => {
-                          const src = group[0]?.src;
-                          if (!src) return;
-                          const globalIdx = allGalleryImages.findIndex(ai => ai.src === src);
-                          if (globalIdx !== -1) setGalleryIndex(globalIdx);
-                        }}
-                      >
-                        <img src={group[0].src} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      </motion.div>
-                      <motion.div 
-                        whileHover={{ scale: 1.1, zIndex: 50 }}
-                        className="w-[14vw] aspect-square rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden border-[6px] md:border-[12px] border-brand-white shadow-[0_20px_50px_rgba(0,0,0,0.2)] bg-brand-gray translate-x-[40%] cursor-pointer rotate-[3deg]"
-                        onClick={() => {
-                          const src = group[1]?.src;
-                          if (!src) return;
-                          const globalIdx = allGalleryImages.findIndex(ai => ai.src === src);
-                          if (globalIdx !== -1) setGalleryIndex(globalIdx);
-                        }}
-                      >
-                        <img src={group[1].src} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      </motion.div>
-                    </div>
-
-                    {/* Main Focus */}
-                    <motion.div 
-                      whileHover={{ scale: 1.05, zIndex: 60 }}
-                      className="w-[28vw] aspect-video rounded-[2rem] md:rounded-[3.5rem] overflow-hidden border-[8px] md:border-[16px] border-brand-white shadow-[0_40px_80px_rgba(0,0,0,0.4)] bg-brand-gray relative z-30 translate-y-[5%] cursor-pointer"
-                      onClick={() => {
-                        const src = group[2]?.src;
-                        if (!src) return;
-                        const globalIdx = allGalleryImages.findIndex(ai => ai.src === src);
-                        if (globalIdx !== -1) setGalleryIndex(globalIdx);
-                      }}
-                    >
-                      <img src={group[2].src} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    </motion.div>
-
-                    {/* Sub-cluster 2 */}
-                    <div className="flex flex-col space-y-6 md:space-y-12 translate-y-[15%] translate-x-[-10%] relative z-20">
-                      <motion.div 
-                        whileHover={{ scale: 1.1, zIndex: 50 }}
-                        className="w-[15vw] aspect-[3/4] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden border-[6px] md:border-[12px] border-brand-white shadow-[0_20px_50px_rgba(0,0,0,0.2)] bg-brand-gray cursor-pointer rotate-[1deg]"
-                        onClick={() => {
-                          const src = group[3]?.src;
-                          if (!src) return;
-                          const globalIdx = allGalleryImages.findIndex(ai => ai.src === src);
-                          if (globalIdx !== -1) setGalleryIndex(globalIdx);
-                        }}
-                      >
-                        <img src={group[3].src} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      </motion.div>
-                      <motion.div 
-                        whileHover={{ scale: 1.1, zIndex: 50 }}
-                        className="w-[20vw] aspect-[16/10] rounded-[1.5rem] md:rounded-[2.5rem] overflow-hidden border-[6px] md:border-[12px] border-brand-white shadow-[0_20px_50px_rgba(0,0,0,0.2)] bg-brand-gray translate-x-[-20%] cursor-pointer rotate-[-1deg]"
-                        onClick={() => {
-                          const src = group[4]?.src;
-                          if (!src) return;
-                          const globalIdx = allGalleryImages.findIndex(ai => ai.src === src);
-                          if (globalIdx !== -1) setGalleryIndex(globalIdx);
-                        }}
-                      >
-                        <img src={group[4].src} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      </motion.div>
-                    </div>
-
-                    {/* Floating Detail */}
-                    <motion.div 
-                      whileHover={{ scale: 1.1, zIndex: 50 }}
-                      className="w-[12vw] aspect-square rounded-[1.5rem] md:rounded-[2rem] overflow-hidden border-[6px] md:border-[10px] border-brand-white shadow-[0_15px_40px_rgba(0,0,0,0.15)] bg-brand-gray relative z-0 translate-y-[-25%] translate-x-[-50%] cursor-pointer rotate-[5deg]"
-                      onClick={() => {
-                        const src = group[5]?.src;
-                        if (!src) return;
-                        const globalIdx = allGalleryImages.findIndex(ai => ai.src === src);
-                        if (globalIdx !== -1) setGalleryIndex(globalIdx);
-                      }}
-                    >
-                      <img src={group[5].src} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    </motion.div>
+          <AnimatePresence mode="wait">
+            {!showAllImages ? (
+              <motion.div 
+                key="cluster"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                className="max-w-6xl mx-auto"
+              >
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 min-h-[600px]">
+                  {/* Featured Large */}
+                  <div 
+                    className="col-span-2 row-span-2 relative group cursor-pointer overflow-hidden rounded-3xl shadow-xl border border-brand-white/20"
+                    onClick={() => setGalleryIndex(0)}
+                  >
+                    <img 
+                      src={HERO_IMAGES[0].src} 
+                      className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" 
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute inset-0 bg-brand-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                   </div>
-                );
-              })}
-            </motion.div>
+                  
+                  {/* Secondary items */}
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <div 
+                      key={i}
+                      className={`relative group cursor-pointer overflow-hidden rounded-2xl shadow-lg border border-brand-white/20 ${i === 1 || i === 2 ? 'md:col-span-1' : ''}`}
+                      onClick={() => setGalleryIndex(i)}
+                    >
+                      <img 
+                        src={HERO_IMAGES[i].src} 
+                        className="w-full h-full object-cover aspect-square transition-transform duration-1000 group-hover:scale-110" 
+                        referrerPolicy="no-referrer"
+                      />
+                      <div className="absolute inset-0 bg-brand-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div 
+                key="masonry"
+                initial={{ opacity: 0, y: 30 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -30 }}
+                transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+                className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-6 space-y-6"
+              >
+                {HERO_IMAGES.map((img, idx) => (
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: idx * 0.01 }}
+                    viewport={{ once: true }}
+                    whileHover={{ scale: 1.02 }}
+                    className="relative break-inside-avoid rounded-2xl overflow-hidden cursor-pointer group shadow-lg border border-brand-white/20"
+                    onClick={() => {
+                      const src = img.src;
+                      const globalIdx = allGalleryImages.findIndex(ai => ai.src === src);
+                      if (globalIdx !== -1) setGalleryIndex(globalIdx);
+                      else setGalleryIndex(idx);
+                    }}
+                  >
+                    <img 
+                      src={img.src} 
+                      alt={img.caption} 
+                      className="w-full h-auto object-cover grayscale-[0.2] transition-all duration-700 group-hover:grayscale-0"
+                      loading="lazy"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-brand-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end p-6">
+                      <span className="text-brand-white text-xs font-serif italic tracking-wider">{img.caption}</span>
+                    </div>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="mt-16 flex justify-center">
+            <button 
+              onClick={() => setShowAllImages(!showAllImages)}
+              className="px-12 py-4 rounded-full border border-brand-black/20 text-brand-black text-[10px] uppercase tracking-[0.4em] font-bold hover:bg-brand-black hover:text-brand-white transition-all duration-500 flex items-center gap-3 group"
+            >
+              {showAllImages ? (
+                <>Collapse Collection <X className="w-3 h-3" /></>
+              ) : (
+                <>Explore Entire Collective (35 Images) <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" /></>
+              )}
+            </button>
           </div>
         </div>
       </section>

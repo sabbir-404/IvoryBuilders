@@ -370,6 +370,31 @@ export default function App() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [monthlyRent, setMonthlyRent] = useState<number | null>(null);
   const [outdoorImage, setOutdoorImage] = useState<string | null>(null);
+  const [isMaintenanceMode] = useState(true); // Temporary flag
+
+  // Maintenance View
+  if (isMaintenanceMode) {
+    return (
+      <div className="min-h-screen bg-brand-white flex items-center justify-center p-6 text-center">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-md"
+        >
+          <div className="mb-8 flex justify-center text-brand-black/20">
+            <ShieldAlert className="w-16 h-16" />
+          </div>
+          <h1 className="text-3xl font-serif italic mb-4">Service Notice</h1>
+          <p className="text-brand-black/60 leading-relaxed mb-8">
+            Vercel resources have been used up. Please contact the developer for further assistance.
+          </p>
+          <div className="pt-8 border-t border-brand-black/5">
+            <p className="text-[10px] uppercase tracking-widest text-brand-black/40 font-bold">Temporary Status</p>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   // Form state
   const [formState, setFormState] = useState({ 

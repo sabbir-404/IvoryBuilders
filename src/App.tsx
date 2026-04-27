@@ -370,7 +370,7 @@ export default function App() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [monthlyRent, setMonthlyRent] = useState<number | null>(null);
   const [outdoorImage, setOutdoorImage] = useState<string | null>(null);
-  const [isMaintenanceMode] = useState(true); // Temporary flag
+  const [isMaintenanceMode] = useState(false); // Temporary flag
 
   // Maintenance View
   if (isMaintenanceMode) {

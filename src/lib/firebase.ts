@@ -19,7 +19,7 @@ const app = initializeApp(firebaseConfig);
 // Using initializeFirestore instead of getFirestore to provide experimental settings
 // experimentalAutoDetectLongPolling helps in environments where WebSockets are flaky
 export const db = initializeFirestore(app, {
-  experimentalAutoDetectLongPolling: true,
+  experimentalForceLongPolling: true,
   cacheSizeBytes: CACHE_SIZE_UNLIMITED
 }, firebaseConfig.firestoreDatabaseId);
 

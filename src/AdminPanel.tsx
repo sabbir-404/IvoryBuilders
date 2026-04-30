@@ -18,9 +18,7 @@ import {
   signOut, 
   onAuthStateChanged, 
   User,
-  createUserWithEmailAndPassword,
-  signInWithPopup,
-  GoogleAuthProvider
+  createUserWithEmailAndPassword
 } from 'firebase/auth';
 import { db, auth } from './lib/firebase';
 import { 
@@ -228,29 +226,6 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    if (authLoading) return;
-    setAuthLoading(true);
-    try {
-      const provider = new GoogleAuthProvider();
-      // Add custom parameters to force account selection if needed
-      provider.setCustomParameters({ prompt: 'select_account' });
-      await signInWithPopup(auth, provider);
-      toast.success('Logged in with Google');
-    } catch (error: any) {
-      console.error('Google login error:', error.code, error.message);
-      if (error.code === 'auth/cancelled-popup-request') {
-        toast.error('Login cancelled. Please try again and keep the popup window open.');
-      } else if (error.code === 'auth/popup-blocked') {
-        toast.error('Popup blocked. Please allow popups for this site.');
-      } else {
-        toast.error('Google login failed: ' + error.message);
-      }
-    } finally {
-      setAuthLoading(false);
-    }
-  };
-
   const handleLogout = () => {
     signOut(auth);
     onClose();
@@ -353,34 +328,6 @@ export default function AdminPanel({ onClose }: { onClose: () => void }) {
               >
                 {authLoading ? 'Logging in...' : 'Login'}
               </Button>
-              
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-brand-white px-2 text-brand-black/40">Or continue with</span>
-                </div>
-              </div>
-
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={handleGoogleLogin}
-                disabled={authLoading}
-                className="w-full rounded-full py-6 border-brand-black/10"
-              >
-                {authLoading ? 'Connecting...' : 'Login with Google'}
-              </Button>
-              
-              <div className="mt-6 p-4 bg-brand-gray/50 rounded-xl text-[10px] text-brand-black/40 leading-relaxed">
-                <p className="font-bold mb-1 uppercase tracking-widest">Troubleshooting:</p>
-                <ul className="list-disc pl-4 space-y-1">
-                  <li>Ensure Email/Password provider is enabled in Firebase Console.</li>
-                  <li>Check if popups are allowed in your browser for Google Login.</li>
-                  <li>Default admin: <strong>islam</strong> / <strong>Noor@#9083</strong></li>
-                </ul>
-              </div>
             </form>
           </CardContent>
           <CardFooter className="justify-center">

@@ -345,7 +345,7 @@ const ImageWithSkeleton = ({
         src={src}
         alt={alt}
         loading={loading}
-        className={`${className} transition-opacity duration-700 ${isLoaded ? 'opacity-100' : 'opacity-0'}`}
+        className={`${className} transition-opacity duration-700 ${isLoaded || loading === 'eager' ? 'opacity-100' : 'opacity-0'}`}
         onLoad={() => setIsLoaded(true)}
         onError={(e) => {
           if (fallback && e.currentTarget.src !== fallback) {
@@ -548,41 +548,31 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const validateImages = async () => {
+    // Optimization: Skip heavyweight validation on first load to improve LCP
+    // Just use the first 10 for the rotation pool initially
+    setLandscapeImages(HERO_IMAGES.slice(0, 10));
+    
+    const validateExtraImages = async () => {
       const results = await Promise.all(
-        HERO_IMAGES.map((img) => {
+        HERO_IMAGES.slice(10).map((img) => {
           return new Promise<typeof HERO_IMAGES[0] | null>((resolve) => {
             const image = new Image();
             image.src = img.src;
             image.onload = () => {
-              // Only accept landscape or square images
-              if (image.naturalWidth >= image.naturalHeight) {
-                resolve(img);
-              } else {
-                resolve(null);
-              }
+              if (image.naturalWidth >= image.naturalHeight) resolve(img);
+              else resolve(null);
             };
-            image.onerror = () => {
-              // If main image fails, check fallback
-              const fallbackImage = new Image();
-              fallbackImage.src = img.fallback;
-              fallbackImage.onload = () => {
-                if (fallbackImage.naturalWidth >= fallbackImage.naturalHeight) {
-                  resolve(img);
-                } else {
-                  resolve(null);
-                }
-              };
-              fallbackImage.onerror = () => resolve(null);
-            };
+            image.onerror = () => resolve(null);
           });
         })
       );
       const filtered = results.filter((img): img is typeof HERO_IMAGES[0] => img !== null);
-      setLandscapeImages(filtered.length > 0 ? filtered : HERO_IMAGES.slice(0, 5)); // Fallback to first 5 if none pass
+      setLandscapeImages(prev => [...prev, ...filtered]);
     };
 
-    validateImages();
+    // Run heavier validation after 2 seconds to prioritize above-the-fold content
+    const timeout = setTimeout(validateExtraImages, 2000);
+    return () => clearTimeout(timeout);
   }, []);
 
   useEffect(() => {
@@ -758,6 +748,7 @@ export default function App() {
                 className="w-full h-full object-cover select-none"
                 loading="eager"
                 referrerPolicy="no-referrer"
+                fetchpriority="high"
               />
               <div className="absolute inset-0 bg-gradient-to-b from-brand-black/20 via-transparent to-brand-black/60" />
             </motion.div>
@@ -769,7 +760,7 @@ export default function App() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 1.5, ease: "easeOut" }}
-            className="text-4xl md:text-[10rem] font-serif italic mb-4 md:mb-12 leading-[1.1] md:leading-[0.95] tracking-tighter"
+            className="text-4xl md:text-8xl lg:text-[10rem] font-serif italic mb-4 md:mb-12 leading-[1.1] md:leading-[0.95] tracking-tighter"
           >
             Ajmeri <br /> Ivory
           </motion.h1>
@@ -782,10 +773,12 @@ export default function App() {
           >
             <a 
               href="#gallery"
-              className="inline-flex items-center space-x-2 border border-brand-white/30 px-5 py-2 rounded-full hover:bg-brand-white hover:text-brand-black transition-all duration-500 group backdrop-blur-sm"
+              className="inline-flex items-center space-x-3 md:space-x-4 bg-brand-white/10 hover:bg-brand-white text-brand-white hover:text-brand-black px-6 py-3 md:px-10 md:py-4 rounded-full transition-all duration-700 backdrop-blur-md group border border-brand-white/20"
             >
-              <span className="text-[9px] md:text-[10px] uppercase tracking-[0.2em] font-bold">Discover the space</span>
-              <ChevronRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+              <span className="text-[9px] md:text-xs uppercase tracking-[0.3em] font-bold">Discover the space</span>
+              <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-brand-white/20 group-hover:bg-brand-black/10 flex items-center justify-center transition-colors">
+                <ChevronRight className="w-3 h-3 md:w-3.5 md:h-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </div>
             </a>
           </motion.div>
         </div>
@@ -828,24 +821,24 @@ export default function App() {
             className="text-brand-black/60 leading-relaxed space-y-4"
           >
             {/* Quick-Specs Highlight Bar with Icons */}
-            <div className="flex items-center justify-between py-4 border-y border-brand-black/5 mb-4">
-              <div className="flex-1 flex flex-col items-center md:items-start text-center md:text-left">
-                <Home className="w-4 h-4 text-brand-black/20 mb-2" />
-                <p className="text-[9px] uppercase tracking-widest font-bold text-brand-black/20 mb-0.5">Size</p>
-                <p className="text-sm font-bold text-brand-black">2,150 SFT</p>
+            <div className="max-w-lg">
+              <div className="flex flex-wrap md:flex-nowrap items-center justify-between py-6 border-y border-brand-black/5 mb-8 gap-4 md:gap-0 bg-brand-gray/30 rounded-2xl md:bg-transparent md:rounded-none md:border-y-2">
+              <div className="flex-1 flex flex-col items-center md:items-start border-r border-brand-black/10 px-1 md:px-4 lg:px-6 min-w-0">
+                <Home className="w-5 h-5 text-brand-black/40 mb-3 hidden md:block" />
+                <p className="text-[7px] md:text-[11px] uppercase tracking-widest font-black text-brand-black/20 mb-1 leading-none">Size</p>
+                <p className="text-[10px] md:text-base lg:text-lg font-bold text-brand-black leading-tight truncate w-full md:w-auto">2,150 SFT</p>
               </div>
-              <div className="w-[1px] h-10 bg-brand-black/10 mx-2" />
-              <div className="flex-1 flex flex-col items-center text-center">
-                <Users className="w-4 h-4 text-brand-black/20 mb-2" />
-                <p className="text-[9px] uppercase tracking-widest font-bold text-brand-black/20 mb-0.5">Layout</p>
-                <p className="text-sm font-bold text-brand-black">4 Bedrooms</p>
+              <div className="flex-1 flex flex-col items-center border-r border-brand-black/10 px-1 md:px-4 lg:px-6 min-w-0">
+                <Users className="w-5 h-5 text-brand-black/40 mb-3 hidden md:block" />
+                <p className="text-[7px] md:text-[11px] uppercase tracking-widest font-black text-brand-black/20 mb-1 leading-none">Layout</p>
+                <p className="text-[10px] md:text-base lg:text-lg font-bold text-brand-black leading-tight whitespace-nowrap">4 Bedrooms</p>
               </div>
-              <div className="w-[1px] h-10 bg-brand-black/10 mx-2" />
-              <div className="flex-1 flex flex-col items-center md:items-end text-center md:text-right">
-                <MapPinned className="w-4 h-4 text-brand-black/20 mb-2" />
-                <p className="text-[9px] uppercase tracking-widest font-bold text-brand-black/20 mb-0.5">Floor</p>
-                <p className="text-sm font-bold text-brand-black">5th Floor</p>
+              <div className="flex-1 flex flex-col items-center md:items-center px-1 md:px-4 lg:px-6 min-w-0">
+                <MapPinned className="w-5 h-5 text-brand-black/40 mb-3 hidden md:block" />
+                <p className="text-[7px] md:text-[11px] uppercase tracking-widest font-black text-brand-black/20 mb-1 leading-none">Floor</p>
+                <p className="text-[10px] md:text-base lg:text-lg font-bold text-brand-black leading-tight whitespace-nowrap">5th Floor</p>
               </div>
+            </div>
             </div>
 
             <div className="space-y-4 md:space-y-5">
@@ -911,7 +904,8 @@ export default function App() {
                     <img 
                       src={landmark.image} 
                       alt={landmark.name}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover transition-opacity duration-500"
+                      loading="lazy"
                       referrerPolicy="no-referrer"
                     />
                   ) : (
@@ -1421,16 +1415,16 @@ export default function App() {
               <button 
                 type="submit"
                 disabled={isSubmitting}
-                className="inline-flex items-center space-x-6 bg-brand-black text-brand-white px-16 py-6 rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 group shadow-xl shadow-brand-black/10"
+                className="inline-flex items-center space-x-4 md:space-x-6 bg-brand-black text-brand-white px-10 py-4 md:px-16 md:py-6 rounded-full hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 group shadow-xl shadow-brand-black/10"
               >
                 {isSubmitting ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    <span className="text-sm uppercase tracking-[0.2em] font-bold">Processing...</span>
+                    <span className="text-xs md:text-sm uppercase tracking-[0.2em] font-bold">Processing...</span>
                   </>
                 ) : (
                   <>
-                    <span className="text-sm uppercase tracking-[0.2em] font-bold">Submit Application</span>
+                    <span className="text-xs md:text-sm uppercase tracking-[0.2em] font-bold">Submit Application</span>
                     <Send className="w-4 h-4 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
                   </>
                 )}

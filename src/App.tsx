@@ -103,12 +103,12 @@ const LANDMARKS = [
   },
   { 
     name: "300 Feet Road", 
-    distance: "4 mins", 
+    distance: "3 mins", 
     category: "Transit", 
-    distKm: "1.5 km", 
+    distKm: "900m", 
     icon: <Navigation className="w-5 h-5" />, 
     image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcREMSeefSq9OwPAN9pAjr6ClLKWBqUL9f5BCg&s",
-    link: "https://maps.google.com/?q=300+Feet+Road+Dhaka",
+    link: "https://maps.app.goo.gl/aDwSWgSvij6DotWx7",
     usp: "Scenic Purbachal highway, the gateway to new Dhaka."
   },
   { 
@@ -202,6 +202,7 @@ const COLLECTION_CATALOG = [
   { id: 'Family_Living', label: 'Family Living' },
   { id: 'Formal_Living', label: 'Formal Living' },
   { id: 'Foyer', label: 'Foyer' },
+  { id: 'Kitchen', label: 'Kitchen' },
 ];
 
 const HERO_IMAGES = Array.from({ length: 35 }, (_, i) => ({

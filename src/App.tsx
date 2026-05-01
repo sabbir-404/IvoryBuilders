@@ -196,6 +196,7 @@ const COLLECTION_CATALOG = [
   { id: 'Master_Bedroom', label: 'Master Bedroom' },
   { id: '2nd_Bedroom', label: '2nd Bedroom' },
   { id: '3rd_bedroom', label: '3rd Bedroom' },
+  { id: '4th_Bedroom', label: '4th Bedroom' },
   { id: 'Bathroom', label: 'Bathroom' },
   { id: 'Dining_area', label: 'Dining Area' },
   { id: 'Family_Living', label: 'Family Living' },

@@ -208,16 +208,17 @@ const COLLECTION_CATALOG = [
 
 const HERO_IMAGES = Array.from({ length: 35 }, (_, i) => ({
   src: `${STORAGE_BASE_URL}/hero/${String(i + 1).padStart(2, '0')}.jpg`,
-  fallback: `https://picsum.photos/seed/hero${i + 1}/1920/1080`,
   caption: `View of the apartment space ${i + 1}`
 }));
 
 const CollectionSection = ({ 
   category, 
-  onImageClick 
+  onImageClick,
+  onImagesDiscovered
 }: { 
   category: typeof COLLECTION_CATALOG[0], 
-  onImageClick: (src: string, label: string) => void
+  onImageClick: (src: string, label: string) => void,
+  onImagesDiscovered?: (catLabel: string, catImages: { src: string, ratio: number }[]) => void
 }) => {
   const [images, setImages] = useState<{ src: string, ratio: number }[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -265,8 +266,13 @@ const CollectionSection = ({
       });
 
       const results = await Promise.all(checkImages);
-      setImages(results.filter((img): img is { src: string, ratio: number } => img !== null));
+      const found = results.filter((img): img is { src: string, ratio: number } => img !== null);
+      setImages(found);
       setIsLoading(false);
+
+      if (found.length > 0 && onImagesDiscovered) {
+        onImagesDiscovered(category.label, found);
+      }
     };
 
     fetchImages();
@@ -274,15 +280,20 @@ const CollectionSection = ({
 
   const visibleImages = isExpanded ? images : images.slice(0, 4);
 
-  if (!isInView) {
+  // Elegant skeletons instead of raw spinners/dashed containers to prevent Cumulative Layout Shift (CLS)
+  if (!isInView || isLoading) {
     return (
-      <div ref={elementRef} className="min-h-[200px] flex items-center justify-center border border-dashed border-brand-black/5 rounded-3xl bg-brand-white/20">
-        <Loader2 className="w-6 h-6 animate-spin text-brand-black/10" />
+      <div ref={elementRef} className="py-8 px-2">
+        <div className="h-8 w-48 bg-brand-black/5 animate-pulse rounded mb-4" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="aspect-[4/3] bg-brand-black/5 animate-pulse rounded-2xl md:rounded-3xl" />
+          ))}
+        </div>
       </div>
     );
   }
 
-  if (isLoading) return <div ref={elementRef} className="py-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-brand-black/20" /></div>;
   if (images.length === 0) return null;
 
   return (
@@ -360,6 +371,7 @@ const ImageWithSkeleton = ({
   className, 
   fallback, 
   loading = "lazy",
+  onLoadError,
   ...props 
 }: { 
   src: string; 
@@ -367,6 +379,7 @@ const ImageWithSkeleton = ({
   className?: string; 
   fallback?: string;
   loading?: "lazy" | "eager";
+  onLoadError?: (src: string) => void;
   [key: string]: any;
 }) => {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -384,9 +397,55 @@ const ImageWithSkeleton = ({
           if (fallback && e.currentTarget.src !== fallback) {
             e.currentTarget.src = fallback;
           }
+          if (onLoadError) {
+            onLoadError(src);
+          }
         }}
         {...props}
       />
+    </div>
+  );
+};
+
+const FadingGridImage = ({
+  src,
+  alt,
+  className,
+  onClick,
+  onError,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+  onClick?: () => void;
+  onError: () => void;
+}) => {
+  const [currentSrc, setCurrentSrc] = useState(src);
+  const [isFading, setIsFading] = useState(false);
+
+  useEffect(() => {
+    if (src !== currentSrc) {
+      setIsFading(true);
+      const t = setTimeout(() => {
+        setCurrentSrc(src);
+        setIsFading(false);
+      }, 500);
+      return () => clearTimeout(t);
+    }
+  }, [src, currentSrc]);
+
+  return (
+    <div className={`relative overflow-hidden group cursor-pointer ${className}`} onClick={onClick}>
+      <img
+        src={currentSrc}
+        alt={alt}
+        onError={onError}
+        className={`w-full h-full object-cover transition-all duration-700 ease-in-out ${
+          isFading ? "opacity-0 scale-95 blur-sm" : "opacity-100 scale-100"
+        }`}
+        referrerPolicy="no-referrer"
+      />
+      <div className="absolute inset-0 bg-brand-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
     </div>
   );
 };
@@ -404,6 +463,10 @@ export default function App() {
   const [monthlyRent, setMonthlyRent] = useState<number | null>(null);
   const [outdoorImage, setOutdoorImage] = useState<string | null>(null);
   const [isMaintenanceMode] = useState(false); // Temporary flag
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+
+  const [brokenImages, setBrokenImages] = useState<Set<string>>(new Set());
+  const [clusterImages, setClusterImages] = useState<typeof HERO_IMAGES>([]);
 
   // Maintenance View
   if (isMaintenanceMode) {
@@ -522,57 +585,28 @@ export default function App() {
   const [galleryImagesLoaded, setGalleryImagesLoaded] = useState(false);
 
   useEffect(() => {
-    const loadAllImages = async () => {
-      const all: { src: string, label: string }[] = [];
-      
-      // First, add the hero collection (35 perspectives)
-      HERO_IMAGES.forEach((img, i) => {
-        all.push({ src: img.src, label: `Perspective ${i + 1}` });
-      });
-
-      // Instantly set the baseline gallery images with the 35 HERO perspectives
-      // so lightbox can open instantly with hero images if selected early
-      setAllGalleryImages(all);
-
-      // Defer the heavy bulk preloading/checking of sub-categories to keep the initial page mount
-      // extremely lightweight and fast, especially on mobile. We also reduce scans per category
-      // to 6 on mobile and 8 on desktop to avoid wasting memory and CPU on nonexistent files.
-      const runPreload = async () => {
-        const isMobile = window.innerWidth < 768;
-        const scanLength = isMobile ? 6 : 8;
-
-        const catPromises = COLLECTION_CATALOG.map(cat => {
-          return Array.from({ length: scanLength }, (_, i) => {
-            const src = `${STORAGE_BASE_URL}/${cat.id}/${String(i + 1).padStart(2, '0')}.jpg`;
-            return new Promise<{ src: string, label: string } | null>((resolve) => {
-              const img = new Image();
-              img.src = src;
-              img.onload = () => resolve({ src, label: cat.label });
-              img.onerror = () => resolve(null);
-            });
-          });
-        }).flat();
-
-        const results = await Promise.all(catPromises);
-        const filtered = results.filter((img): img is { src: string, label: string } => img !== null);
-        setAllGalleryImages([...all, ...filtered]);
-        setGalleryImagesLoaded(true);
-      };
-
-      const delayMs = window.innerWidth < 768 ? 6000 : 3000;
-      const timeoutId = setTimeout(() => {
-        if ('requestIdleCallback' in window) {
-          (window as any).requestIdleCallback(() => runPreload());
-        } else {
-          runPreload();
-        }
-      }, delayMs);
-
-      return () => clearTimeout(timeoutId);
-    };
-
-    loadAllImages();
+    // Instantly assign the 35 HERO images on mount with zero network/probe overhead.
+    // Categorized photos are dynamically preloaded and merged when the user scrolls down to them.
+    const allMemo: { src: string, label: string }[] = [];
+    HERO_IMAGES.forEach((img, i) => {
+      allMemo.push({ src: img.src, label: `Perspective ${i + 1}` });
+    });
+    setAllGalleryImages(allMemo);
+    setGalleryImagesLoaded(true);
   }, []);
+
+  // Dynamically feed discovered images from lazy scrolled categories to the lightbox pool.
+  // This completely eliminates duplicate parallel startup probing, resolving 50+ network calls.
+  const handleImagesDiscovered = (catLabel: string, catImages: { src: string, ratio: number }[]) => {
+    setAllGalleryImages((prev) => {
+      const existing = new Set(prev.map((item) => item.src));
+      const fresh = catImages
+        .filter((img) => !existing.has(img.src))
+        .map((img) => ({ src: img.src, label: catLabel }));
+      if (fresh.length === 0) return prev;
+      return [...prev, ...fresh];
+    });
+  };
 
   const nextImage = (e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -604,11 +638,78 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // All 35 perspectives are confirmed landscape architectural images.
-    // We instantly assign HERO_IMAGES so there are no delayed, concurrent network requests
-    // that congest mobile cellular bandwidth and slow down above-the-fold rendering.
-    setLandscapeImages(HERO_IMAGES);
+    // Initialize cluster with the first 7 hero images
+    setClusterImages(HERO_IMAGES.slice(0, 7));
   }, []);
+
+  useEffect(() => {
+    // Curate a lighter landscape slice for the sliding hero header (5 on mobile, 8 on desktop).
+    // It dynamically updates to exclude any broken images reported by the slider.
+    const isMobile = window.innerWidth < 768;
+    const initialSliceLength = isMobile ? 5 : 8;
+    const activeValid = HERO_IMAGES.filter(img => !brokenImages.has(img.src));
+    setLandscapeImages(activeValid.slice(0, initialSliceLength));
+  }, [brokenImages]);
+
+  // Centralized dynamic interval effect for "The Gallery Collective" images rotating randomly.
+  useEffect(() => {
+    if (showAllImages || clusterImages.length === 0) return;
+
+    // Changes a random slot every 3 to 5 seconds
+    const interval = setInterval(() => {
+      const slotIndex = Math.floor(Math.random() * clusterImages.length);
+      
+      const currentlyDisplayed = new Set(clusterImages.map(img => img.src));
+      const validPool = HERO_IMAGES.filter(
+        img => !currentlyDisplayed.has(img.src) && !brokenImages.has(img.src)
+      );
+
+      if (validPool.length > 0) {
+        const nextImg = validPool[Math.floor(Math.random() * validPool.length)];
+        setClusterImages(prev => {
+          const updated = [...prev];
+          updated[slotIndex] = nextImg;
+          return updated;
+        });
+      }
+    }, 3000 + Math.random() * 2000);
+
+    return () => clearInterval(interval);
+  }, [clusterImages, brokenImages, showAllImages]);
+
+  // Self-heal on cluster image load error
+  const handleClusterImageError = (failedSrc: string, slotIndex: number) => {
+    setBrokenImages(prev => {
+      const next = new Set(prev);
+      next.add(failedSrc);
+      return next;
+    });
+
+    const currentlyDisplayed = new Set(clusterImages.map(img => img?.src));
+    const validPool = HERO_IMAGES.filter(
+      img => !currentlyDisplayed.has(img.src) && img.src !== failedSrc && !brokenImages.has(img.src)
+    );
+
+    if (validPool.length > 0) {
+      const nextImg = validPool[Math.floor(Math.random() * validPool.length)];
+      setClusterImages(prev => {
+        const updated = [...prev];
+        if (updated[slotIndex]?.src === failedSrc) {
+          updated[slotIndex] = nextImg;
+        }
+        return updated;
+      });
+    }
+  };
+
+  // Self-heal on general list images (like lightboxes or masonry)
+  const handleGeneralImageError = (failedSrc: string) => {
+    setBrokenImages(prev => {
+      const next = new Set(prev);
+      next.add(failedSrc);
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (landscapeImages.length === 0) return;
@@ -778,12 +879,18 @@ export default function App() {
             >
               <ImageWithSkeleton 
                 src={landscapeImages[currentHeroIndex].src} 
-                fallback={landscapeImages[currentHeroIndex].fallback}
                 alt={`Hero Flat ${currentHeroIndex + 1}`} 
                 className="w-full h-full object-cover select-none"
                 loading="eager"
                 referrerPolicy="no-referrer"
                 fetchpriority="high"
+                onLoadError={(src) => {
+                  setBrokenImages(prev => {
+                    const next = new Set(prev);
+                    next.add(src);
+                    return next;
+                  });
+                }}
               />
               <div className="absolute inset-0 bg-gradient-to-b from-brand-black/20 via-transparent to-brand-black/60" />
             </motion.div>
@@ -1051,6 +1158,7 @@ export default function App() {
               <CollectionSection 
                 key={category.id} 
                 category={category} 
+                onImagesDiscovered={handleImagesDiscovered}
                 onImageClick={(src, label) => {
                   const globalIdx = allGalleryImages.findIndex(ai => ai.src === src);
                   if (globalIdx !== -1) {
@@ -1086,33 +1194,37 @@ export default function App() {
               >
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 min-h-[600px]">
                   {/* Featured Large */}
-                  <div 
-                    className="col-span-2 row-span-2 relative group cursor-pointer overflow-hidden rounded-3xl shadow-xl border border-brand-white/20"
-                    onClick={() => setGalleryIndex(0)}
-                  >
-                    <img 
-                      src={HERO_IMAGES[0].src} 
-                      className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" 
-                      referrerPolicy="no-referrer"
+                  {clusterImages[0] && (
+                    <FadingGridImage 
+                      src={clusterImages[0].src} 
+                      alt={clusterImages[0].caption}
+                      className="col-span-2 row-span-2 rounded-3xl shadow-xl border border-brand-white/20 aspect-square md:aspect-auto"
+                      onClick={() => {
+                        const globalIdx = allGalleryImages.findIndex(ai => ai.src === clusterImages[0]?.src);
+                        if (globalIdx !== -1) setGalleryIndex(globalIdx);
+                      }}
+                      onError={() => handleClusterImageError(clusterImages[0].src, 0)}
                     />
-                    <div className="absolute inset-0 bg-brand-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                  </div>
+                  )}
                   
                   {/* Secondary items */}
-                  {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <div 
-                      key={i}
-                      className={`relative group cursor-pointer overflow-hidden rounded-2xl shadow-lg border border-brand-white/20 ${i === 1 || i === 2 ? 'md:col-span-1' : ''}`}
-                      onClick={() => setGalleryIndex(i)}
-                    >
-                      <img 
-                        src={HERO_IMAGES[i].src} 
-                        className="w-full h-full object-cover aspect-square transition-transform duration-1000 group-hover:scale-110" 
-                        referrerPolicy="no-referrer"
+                  {[1, 2, 3, 4, 5, 6].map((i) => {
+                    const img = clusterImages[i];
+                    if (!img) return null;
+                    return (
+                      <FadingGridImage 
+                        key={i}
+                        src={img.src} 
+                        alt={img.caption}
+                        className={`rounded-2xl shadow-lg border border-brand-white/20 aspect-square ${i === 1 || i === 2 ? 'md:col-span-1' : ''}`}
+                        onClick={() => {
+                          const globalIdx = allGalleryImages.findIndex(ai => ai.src === img.src);
+                          if (globalIdx !== -1) setGalleryIndex(globalIdx);
+                        }}
+                        onError={() => handleClusterImageError(img.src, i)}
                       />
-                      <div className="absolute inset-0 bg-brand-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </motion.div>
             ) : (
@@ -1124,9 +1236,9 @@ export default function App() {
                 transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
                 className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-6 space-y-6"
               >
-                {HERO_IMAGES.map((img, idx) => (
+                {HERO_IMAGES.filter(img => !brokenImages.has(img.src)).map((img, idx) => (
                   <motion.div
-                    key={idx}
+                    key={img.src}
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: idx * 0.01 }}
@@ -1134,15 +1246,14 @@ export default function App() {
                     whileHover={{ scale: 1.02 }}
                     className="relative break-inside-avoid rounded-2xl overflow-hidden cursor-pointer group shadow-lg border border-brand-white/20"
                     onClick={() => {
-                      const src = img.src;
-                      const globalIdx = allGalleryImages.findIndex(ai => ai.src === src);
+                      const globalIdx = allGalleryImages.findIndex(ai => ai.src === img.src);
                       if (globalIdx !== -1) setGalleryIndex(globalIdx);
-                      else setGalleryIndex(idx);
                     }}
                   >
                     <img 
                       src={img.src} 
                       alt={img.caption} 
+                      onError={() => handleGeneralImageError(img.src)}
                       className="w-full h-auto object-cover grayscale-[0.2] transition-all duration-700 group-hover:grayscale-0"
                       loading="lazy"
                       referrerPolicy="no-referrer"
@@ -1222,15 +1333,31 @@ export default function App() {
             initial={{ opacity: 0, scale: 0.95 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
-            className="relative aspect-video rounded-3xl overflow-hidden shadow-2xl bg-brand-black"
+            className="relative aspect-video rounded-3xl overflow-hidden shadow-2xl bg-brand-black group cursor-pointer"
+            onClick={() => setIsVideoPlaying(true)}
           >
-            <iframe 
-              src="https://www.youtube.com/embed/jOSTNL9dUmU?autoplay=0&rel=0" 
-              title="Ajmeri Ivory Tour"
-              className="w-full h-full border-0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
-              allowFullScreen
-            />
+            {isVideoPlaying ? (
+              <iframe 
+                src="https://www.youtube.com/embed/jOSTNL9dUmU?autoplay=1&rel=0" 
+                title="Ajmeri Ivory Tour"
+                className="w-full h-full border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+                allowFullScreen
+              />
+            ) : (
+              <div className="absolute inset-0 w-full h-full flex items-center justify-center">
+                <img 
+                  src={`${STORAGE_BASE_URL}/hero/01.jpg`} 
+                  alt="Video Cinematic Tour Thumbnail"
+                  className="absolute inset-0 w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-1000"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-brand-black/30 group-hover:bg-brand-black/40 transition-colors duration-500" />
+                <div className="relative z-10 w-16 h-16 md:w-20 md:h-20 rounded-full bg-brand-white/20 backdrop-blur-md flex items-center justify-center border border-brand-white/40 group-hover:scale-110 group-hover:bg-brand-white group-hover:border-brand-white transition-all duration-500 shadow-lg">
+                  <Play className="w-6 h-6 md:w-8 md:h-8 text-brand-white group-hover:text-brand-black fill-current translate-x-0.5 transition-colors" />
+                </div>
+              </div>
+            )}
           </motion.div>
         </div>
       </section>

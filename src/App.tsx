@@ -43,7 +43,10 @@ import {
   ExternalLink,
   Cctv,
   Zap,
-  Snowflake
+  Snowflake,
+  Copy,
+  Check,
+  FileText
 } from "lucide-react";
 import React, { useState, useEffect, useRef } from "react";
 import { db, auth, handleFirestoreError } from './lib/firebase';
@@ -462,6 +465,7 @@ export default function App() {
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [monthlyRent, setMonthlyRent] = useState<number | null>(null);
   const [outdoorImage, setOutdoorImage] = useState<string | null>(null);
+  const [googleFormUrl, setGoogleFormUrl] = useState<string | null>(null);
   const [isMaintenanceMode] = useState(false); // Temporary flag
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
 
@@ -497,9 +501,31 @@ export default function App() {
     name: '', 
     email: '', 
     dob: '', 
-    residency: '', 
-    maritalStatus: 'unmarried', 
-    familyMembers: 1 
+    nationality: 'Bangladeshi',
+    maritalStatus: 'Single', 
+    religion: 'Islam',
+    profession: '',
+    nid: '',
+    phone: '',
+    presentAddress: '',
+    permanentAddress: '',
+    orgName: '',
+    orgPosition: '',
+    officeAddress: '',
+    officePhone: '',
+    familyMembers: '1', 
+    familyMembersList: [
+      { name: '', relationship: '', age: '' }
+    ] as { name: string; relationship: string; age: string }[],
+    prevAddress: '',
+    prevReason: '',
+    pets: 'No',
+    petsDetails: '',
+    moveInDate: '',
+    emergencyName: '',
+    emergencyRelationship: '',
+    emergencyPhone: '',
+    agreeConsent: false
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -529,11 +555,44 @@ export default function App() {
         if (birthDate > today) error = "Date of birth cannot be in the future";
       }
     }
-    if (name === "residency") {
-      if (!value) error = "Residency information is required";
+    if (name === "nationality") {
+      if (!value) error = "Nationality is required";
     }
-    if (name === "familyMembers") {
-      if (!value || value < 1) error = "At least 1 family member is required";
+    if (name === "religion") {
+      if (!value) error = "Religion is required";
+    }
+    if (name === "profession") {
+      if (!value) error = "Profession / Occupation is required";
+    }
+    if (name === "nid") {
+      if (!value) error = "National ID or Passport Number is required";
+    }
+    if (name === "presentAddress") {
+      if (!value) error = "Present Address is required";
+    }
+    if (name === "permanentAddress") {
+      if (!value) error = "Permanent Address is required";
+    }
+    if (name === "orgName") {
+      if (!value) error = "Organization Name is required";
+    }
+    if (name === "orgPosition") {
+      if (!value) error = "Designation is required";
+    }
+    if (name === "moveInDate") {
+      if (!value) error = "Expected Move-in Date is required";
+    }
+    if (name === "emergencyName") {
+      if (!value) error = "Emergency Contact Name is required";
+    }
+    if (name === "emergencyRelationship") {
+      if (!value) error = "Emergency Contact Relationship is required";
+    }
+    if (name === "emergencyPhone") {
+      if (!value) error = "Emergency Contact Phone is required";
+    }
+    if (name === "agreeConsent") {
+      if (!value) error = "You must agree to the declaration statement";
     }
     
     setFormErrors(prev => ({
@@ -544,7 +603,24 @@ export default function App() {
   };
 
   const handleInputChange = (field: string, value: any) => {
-    setFormState({ ...formState, [field]: value });
+    if (field === 'familyMembers') {
+      const count = parseInt(value) || 1;
+      const currentList = [...formState.familyMembersList];
+      if (currentList.length < count) {
+        while (currentList.length < count) {
+          currentList.push({ name: '', relationship: '', age: '' });
+        }
+      } else if (currentList.length > count) {
+        currentList.splice(count);
+      }
+      setFormState(prev => ({
+        ...prev,
+        familyMembers: value,
+        familyMembersList: currentList
+      }));
+      return;
+    }
+    setFormState(prev => ({ ...prev, [field]: value }));
     validateField(field, value);
   };
 
@@ -574,6 +650,7 @@ export default function App() {
         const data = doc.data();
         setMonthlyRent(data.monthlyRent);
         setOutdoorImage(data.outdoorImage || null);
+        setGoogleFormUrl(data.googleFormUrl || null);
       }
     }, (error) => {
       console.warn("Firestore settings sync notice (app using defaults while offline):", error);
@@ -745,13 +822,30 @@ export default function App() {
     // Validate all fields
     const newErrors: Record<string, string> = {};
     Object.keys(formState).forEach((key) => {
-      const error = validateField(key, (formState as any)[key]);
-      if (error) newErrors[key] = error;
+      if (key !== 'familyMembersList') {
+        const error = validateField(key, (formState as any)[key]);
+        if (error) newErrors[key] = error;
+      }
     });
+
+    // Custom check for family details if count is set
+    const count = parseInt(formState.familyMembers) || 1;
+    let familyMemberError = "";
+    formState.familyMembersList.slice(0, count).forEach((member, idx) => {
+      if (!member.name.trim()) {
+        familyMemberError = `Name is required for Family Member ${idx + 1}`;
+      } else if (!member.relationship.trim()) {
+        familyMemberError = `Relationship is required for Family Member ${idx + 1}`;
+      }
+    });
+
+    if (familyMemberError) {
+      newErrors["familyMembersList"] = familyMemberError;
+    }
 
     if (Object.keys(newErrors).length > 0) {
       setFormErrors(newErrors);
-      toast.error("Please fix the errors in the form.");
+      toast.error(familyMemberError || "Please fix the errors in the form.");
       return;
     }
 
@@ -783,25 +877,67 @@ export default function App() {
         name: '', 
         email: '', 
         dob: '', 
-        residency: '', 
-        maritalStatus: 'unmarried', 
-        familyMembers: 1 
+        nationality: 'Bangladeshi',
+        maritalStatus: 'Single', 
+        religion: 'Islam',
+        profession: '',
+        nid: '',
+        phone: '',
+        presentAddress: '',
+        permanentAddress: '',
+        orgName: '',
+        orgPosition: '',
+        officeAddress: '',
+        officePhone: '',
+        familyMembers: '1', 
+        familyMembersList: [
+          { name: '', relationship: '', age: '' }
+        ],
+        prevAddress: '',
+        prevReason: '',
+        pets: 'No',
+        petsDetails: '',
+        moveInDate: '',
+        emergencyName: '',
+        emergencyRelationship: '',
+        emergencyPhone: '',
+        agreeConsent: false
       });
       toast.success("Application submitted successfully!");
     } catch (error) {
       console.error('Error submitting application:', error);
       setSubmitStatus('error');
-      // Using helper for robust error info
       try {
         handleFirestoreError(error, 'create', 'applications');
       } catch (err) {
-        // Log the JSON error as per guidelines
         console.error("Firestore Security/Logic Error:", err);
         toast.error("Security/Network error. Please try again later.");
       }
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const effectiveFormUrl = googleFormUrl || "https://docs.google.com/forms/d/e/1FAIpQLSefp3MJxGrkDjj-5N9texyREEUb4fUUJgYzlOlzHKWoAZgcYQ/viewform?embedded=true";
+
+  const [copiedLink, setCopiedLink] = useState(false);
+  const copyGoogleFormLink = () => {
+    if (!effectiveFormUrl) return;
+    const shareUrl = effectiveFormUrl.replace(/[\?&]embedded=true/, "");
+    navigator.clipboard.writeText(shareUrl);
+    setCopiedLink(true);
+    toast.success("Google Form link copied to clipboard!");
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  const getEmbedUrl = (url: string) => {
+    if (!url) return "";
+    let cleanUrl = url.trim();
+    if (!cleanUrl.includes("embedded=true")) {
+      const glue = cleanUrl.includes("?") ? "&" : "?";
+      cleanUrl = `${cleanUrl}${glue}embedded=true`;
+    }
+    return cleanUrl;
   };
 
   return (
@@ -1431,145 +1567,539 @@ export default function App() {
             </p>
           </div>
 
-          <form onSubmit={handleFormSubmit} noValidate className="space-y-6 md:space-y-12 bg-brand-gray/30 p-6 md:p-16 rounded-[32px] md:rounded-[40px] border border-brand-black/5">
-            <div className="grid md:grid-cols-2 gap-6 md:gap-10">
-              <div className="space-y-2 md:space-y-3">
-                <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-black/40 flex items-center">
-                  <Users className="w-3 h-3 mr-2" /> Full Name
-                </label>
-                <input 
-                  type="text" 
-                  value={formState.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  className={`w-full bg-brand-white border-2 rounded-2xl px-5 md:px-6 py-4 md:py-5 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.name ? 'border-red-400' : 'border-transparent'}`}
-                  placeholder="John Doe"
-                />
-                <AnimatePresence>
+          <form 
+            id="interactive-tenant-form"
+            onSubmit={handleFormSubmit} 
+            noValidate 
+            className="space-y-6 md:space-y-12 bg-brand-gray/30 p-6 md:p-16 rounded-[32px] md:rounded-[40px] border border-brand-black/5 w-full block"
+          >
+            {/* SECTION 1: Personal Details */}
+            <div className="space-y-6">
+              <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-brand-black/60 pb-2 border-b border-brand-black/10 flex items-center">
+                <Users className="w-4 h-4 mr-2" /> 1. Personal Information
+              </h3>
+              
+              <div className="grid md:grid-cols-2 gap-6 md:gap-8">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                    Full Name (Tenant) *
+                  </label>
+                  <input 
+                    type="text" 
+                    value={formState.name}
+                    onChange={(e) => handleInputChange('name', e.target.value)}
+                    className={`w-full bg-brand-white border-2 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.name ? 'border-red-400' : 'border-transparent'}`}
+                    placeholder="e.g. Sabbir Islam"
+                  />
                   {formErrors.name && (
-                    <motion.p 
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="text-[10px] text-red-500 font-medium ml-1"
-                    >
-                      {formErrors.name}
-                    </motion.p>
+                    <p className="text-[10px] text-red-500 font-medium ml-1">{formErrors.name}</p>
                   )}
-                </AnimatePresence>
-              </div>
-              <div className="space-y-2 md:space-y-3">
-                <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-black/40 flex items-center">
-                  <Send className="w-3 h-3 mr-2" /> Email Address
-                </label>
-                <input 
-                  type="email" 
-                  value={formState.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  className={`w-full bg-brand-white border-2 rounded-2xl px-5 md:px-6 py-4 md:py-5 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.email ? 'border-red-400' : 'border-transparent'}`}
-                  placeholder="john@example.com"
-                />
-                <AnimatePresence>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                    Email Address *
+                  </label>
+                  <input 
+                    type="email" 
+                    value={formState.email}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    className={`w-full bg-brand-white border-2 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.email ? 'border-red-400' : 'border-transparent'}`}
+                    placeholder="email@example.com"
+                  />
                   {formErrors.email && (
-                    <motion.p 
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="text-[10px] text-red-500 font-medium ml-1"
-                    >
-                      {formErrors.email}
-                    </motion.p>
+                    <p className="text-[10px] text-red-500 font-medium ml-1">{formErrors.email}</p>
                   )}
-                </AnimatePresence>
+                </div>
               </div>
-            </div>
 
-            <div className="grid md:grid-cols-2 gap-6 md:gap-10">
-              <div className="space-y-2 md:space-y-3">
-                <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-black/40 flex items-center">
-                  <Calendar className="w-3 h-3 mr-2" /> Date of Birth
-                </label>
-                <input 
-                  type="date" 
-                  value={formState.dob}
-                  onChange={(e) => handleInputChange('dob', e.target.value)}
-                  className={`w-full bg-brand-white border-2 rounded-2xl px-5 md:px-6 py-4 md:py-5 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.dob ? 'border-red-400' : 'border-transparent'}`}
-                />
-                <AnimatePresence>
+              <div className="grid md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                    Date of Birth *
+                  </label>
+                  <input 
+                    type="date" 
+                    value={formState.dob}
+                    onChange={(e) => handleInputChange('dob', e.target.value)}
+                    className={`w-full bg-brand-white border-2 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.dob ? 'border-red-400' : 'border-transparent'}`}
+                  />
                   {formErrors.dob && (
-                    <motion.p 
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="text-[10px] text-red-500 font-medium ml-1"
-                    >
-                      {formErrors.dob}
-                    </motion.p>
+                    <p className="text-[10px] text-red-500 font-medium ml-1">{formErrors.dob}</p>
                   )}
-                </AnimatePresence>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                    Nationality *
+                  </label>
+                  <input 
+                    type="text" 
+                    value={formState.nationality}
+                    onChange={(e) => handleInputChange('nationality', e.target.value)}
+                    className={`w-full bg-brand-white border-2 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.nationality ? 'border-red-400' : 'border-transparent'}`}
+                    placeholder="e.g. Bangladeshi"
+                  />
+                  {formErrors.nationality && (
+                    <p className="text-[10px] text-red-500 font-medium ml-1">{formErrors.nationality}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                    Religion *
+                  </label>
+                  <input 
+                    type="text" 
+                    value={formState.religion}
+                    onChange={(e) => handleInputChange('religion', e.target.value)}
+                    className={`w-full bg-brand-white border-2 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.religion ? 'border-red-400' : 'border-transparent'}`}
+                    placeholder="e.g. Islam"
+                  />
+                  {formErrors.religion && (
+                    <p className="text-[10px] text-red-500 font-medium ml-1">{formErrors.religion}</p>
+                  )}
+                </div>
               </div>
-              <div className="space-y-2 md:space-y-3">
-                <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-black/40 flex items-center">
-                  <MapPinned className="w-3 h-3 mr-2" /> Residency (Where are you from?)
-                </label>
-                <input 
-                  type="text" 
-                  value={formState.residency}
-                  onChange={(e) => handleInputChange('residency', e.target.value)}
-                  className={`w-full bg-brand-white border-2 rounded-2xl px-5 md:px-6 py-4 md:py-5 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.residency ? 'border-red-400' : 'border-transparent'}`}
-                  placeholder="City, Country"
-                />
-                <AnimatePresence>
-                  {formErrors.residency && (
-                    <motion.p 
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="text-[10px] text-red-500 font-medium ml-1"
-                    >
-                      {formErrors.residency}
-                    </motion.p>
+
+              <div className="grid md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                    Marital Status *
+                  </label>
+                  <select 
+                    value={formState.maritalStatus}
+                    onChange={(e) => handleInputChange('maritalStatus', e.target.value)}
+                    className="w-full bg-brand-white border-2 border-transparent rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm cursor-pointer"
+                  >
+                    <option value="Single">Single</option>
+                    <option value="Married">Married</option>
+                    <option value="Divorced">Divorced</option>
+                    <option value="Widowed">Widowed</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                    Profession / Occupation *
+                  </label>
+                  <input 
+                    type="text" 
+                    value={formState.profession}
+                    onChange={(e) => handleInputChange('profession', e.target.value)}
+                    className={`w-full bg-brand-white border-2 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.profession ? 'border-red-400' : 'border-transparent'}`}
+                    placeholder="e.g. Software Engineer"
+                  />
+                  {formErrors.profession && (
+                    <p className="text-[10px] text-red-500 font-medium ml-1">{formErrors.profession}</p>
                   )}
-                </AnimatePresence>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                    National ID / Passport No. *
+                  </label>
+                  <input 
+                    type="text" 
+                    value={formState.nid}
+                    onChange={(e) => handleInputChange('nid', e.target.value)}
+                    className={`w-full bg-brand-white border-2 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.nid ? 'border-red-400' : 'border-transparent'}`}
+                    placeholder="e.g. 199XXXXXXXXXX"
+                  />
+                  {formErrors.nid && (
+                    <p className="text-[10px] text-red-500 font-medium ml-1">{formErrors.nid}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-1 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                    Mobile Number
+                  </label>
+                  <input 
+                    type="text" 
+                    value={formState.phone}
+                    onChange={(e) => handleInputChange('phone', e.target.value)}
+                    className="w-full bg-brand-white border-2 border-transparent rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm"
+                    placeholder="e.g. +8801XXXXXXXXX"
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                    Present Address *
+                  </label>
+                  <textarea 
+                    value={formState.presentAddress}
+                    onChange={(e) => handleInputChange('presentAddress', e.target.value)}
+                    className={`w-full bg-brand-white border-2 rounded-2xl px-5 py-4 h-24 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm resize-none ${formErrors.presentAddress ? 'border-red-400' : 'border-transparent'}`}
+                    placeholder="Your current living address"
+                  />
+                  {formErrors.presentAddress && (
+                    <p className="text-[10px] text-red-500 font-medium ml-1">{formErrors.presentAddress}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                    Permanent Address *
+                  </label>
+                  <textarea 
+                    value={formState.permanentAddress}
+                    onChange={(e) => handleInputChange('permanentAddress', e.target.value)}
+                    className={`w-full bg-brand-white border-2 rounded-2xl px-5 py-4 h-24 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm resize-none ${formErrors.permanentAddress ? 'border-red-400' : 'border-transparent'}`}
+                    placeholder="Your permanent home address"
+                  />
+                  {formErrors.permanentAddress && (
+                    <p className="text-[10px] text-red-500 font-medium ml-1">{formErrors.permanentAddress}</p>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-6 md:gap-10">
-              <div className="space-y-2 md:space-y-3">
-                <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-black/40 flex items-center">
-                  <Heart className="w-3 h-3 mr-2" /> Marital Status
+            {/* SECTION 2: Employment Information */}
+            <div className="space-y-6 pt-6 border-t border-brand-black/10">
+              <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-brand-black/60 pb-2 border-b border-brand-black/10 flex items-center">
+                <FileText className="w-4 h-4 mr-2" /> 2. Employment Information
+              </h3>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                    Organization / Company Name *
+                  </label>
+                  <input 
+                    type="text" 
+                    value={formState.orgName}
+                    onChange={(e) => handleInputChange('orgName', e.target.value)}
+                    className={`w-full bg-brand-white border-2 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.orgName ? 'border-red-400' : 'border-transparent'}`}
+                    placeholder="e.g. Acme Corp"
+                  />
+                  {formErrors.orgName && (
+                    <p className="text-[10px] text-red-500 font-medium ml-1">{formErrors.orgName}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                    Position / Designation *
+                  </label>
+                  <input 
+                    type="text" 
+                    value={formState.orgPosition}
+                    onChange={(e) => handleInputChange('orgPosition', e.target.value)}
+                    className={`w-full bg-brand-white border-2 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.orgPosition ? 'border-red-400' : 'border-transparent'}`}
+                    placeholder="e.g. Product Manager"
+                  />
+                  {formErrors.orgPosition && (
+                    <p className="text-[10px] text-red-500 font-medium ml-1">{formErrors.orgPosition}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                    Office Address
+                  </label>
+                  <textarea 
+                    value={formState.officeAddress}
+                    onChange={(e) => handleInputChange('officeAddress', e.target.value)}
+                    className="w-full bg-brand-white border-2 border-transparent rounded-2xl px-5 py-4 h-24 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm resize-none"
+                    placeholder="Full office address"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                    Office Phone Number
+                  </label>
+                  <input 
+                    type="text" 
+                    value={formState.officePhone}
+                    onChange={(e) => handleInputChange('officePhone', e.target.value)}
+                    className="w-full bg-brand-white border-2 border-transparent rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm"
+                    placeholder="e.g. +8802XXXXXX"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* SECTION 3: Family Information */}
+            <div className="space-y-6 pt-6 border-t border-brand-black/10">
+              <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-brand-black/60 pb-2 border-b border-brand-black/10 flex items-center">
+                <Home className="w-4 h-4 mr-2" /> 3. Family Information
+              </h3>
+
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50 block">
+                  Number of Family Members (excluding yourself) *
                 </label>
                 <select 
-                  value={formState.maritalStatus}
-                  onChange={(e) => handleInputChange('maritalStatus', e.target.value)}
-                  className="w-full bg-brand-white border-2 border-transparent rounded-2xl px-5 md:px-6 py-4 md:py-5 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm appearance-none"
+                  value={formState.familyMembers}
+                  onChange={(e) => handleInputChange('familyMembers', e.target.value)}
+                  className="w-full md:w-1/3 bg-brand-white border-2 border-transparent rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm cursor-pointer appearance-none"
                 >
-                  <option value="unmarried">Unmarried</option>
-                  <option value="married">Married</option>
+                  <option value="1">1 Person</option>
+                  <option value="2">2 Persons</option>
+                  <option value="3">3 Persons</option>
+                  <option value="4">4 Persons</option>
+                  <option value="5">5 Persons</option>
                 </select>
               </div>
-              <div className="space-y-2 md:space-y-3">
-                <label className="text-[10px] uppercase tracking-[0.2em] font-bold text-brand-black/40 flex items-center">
-                  <Home className="w-3 h-3 mr-2" /> Family Members
-                </label>
-                <input 
-                  type="number" 
-                  min="1"
-                  value={formState.familyMembers}
-                  onChange={(e) => handleInputChange('familyMembers', parseInt(e.target.value))}
-                  className={`w-full bg-brand-white border-2 rounded-2xl px-5 md:px-6 py-4 md:py-5 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.familyMembers ? 'border-red-400' : 'border-transparent'}`}
-                />
-                <AnimatePresence>
-                  {formErrors.familyMembers && (
-                    <motion.p 
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      className="text-[10px] text-red-500 font-medium ml-1"
-                    >
-                      {formErrors.familyMembers}
-                    </motion.p>
+
+              {/* Dynamic family list */}
+              <div className="p-6 bg-brand-white border border-brand-black/5 rounded-3xl space-y-4">
+                <span className="text-[10px] uppercase tracking-wider font-bold text-brand-black/50 block">
+                  Family Member Information Details
+                </span>
+                
+                {formErrors.familyMembersList && (
+                  <p className="text-xs text-red-500 font-semibold bg-red-50 border border-red-100 rounded-xl px-4 py-2">
+                    {formErrors.familyMembersList}
+                  </p>
+                )}
+
+                <div className="space-y-4">
+                  {[...Array(parseInt(formState.familyMembers) || 1)].map((_, idx) => (
+                    <div key={idx} className="p-4 bg-brand-gray/30 rounded-2xl border border-brand-black/5 space-y-3">
+                      <p className="text-[10px] uppercase tracking-widest font-bold text-brand-black/40">Member {idx + 1}</p>
+                      <div className="grid sm:grid-cols-3 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[9px] uppercase tracking-wider font-bold text-brand-black/40">Name *</label>
+                          <input 
+                            type="text" 
+                            className="w-full bg-brand-white border border-brand-black/10 rounded-xl px-4 py-2.5 text-xs focus:ring-1 focus:ring-brand-black outline-none"
+                            placeholder="Full Name"
+                            value={formState.familyMembersList[idx]?.name || ''}
+                            onChange={(e) => {
+                              const list = [...formState.familyMembersList];
+                              if (!list[idx]) list[idx] = { name: '', relationship: '', age: '' };
+                              list[idx].name = e.target.value;
+                              setFormState(prev => ({ ...prev, familyMembersList: list }));
+                              setFormErrors(prev => ({ ...prev, familyMembersList: '' }));
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] uppercase tracking-wider font-bold text-brand-black/40">Relationship *</label>
+                          <input 
+                            type="text" 
+                            className="w-full bg-brand-white border border-brand-black/10 rounded-xl px-4 py-2.5 text-xs focus:ring-1 focus:ring-brand-black outline-none"
+                            placeholder="e.g. Spouse"
+                            value={formState.familyMembersList[idx]?.relationship || ''}
+                            onChange={(e) => {
+                              const list = [...formState.familyMembersList];
+                              if (!list[idx]) list[idx] = { name: '', relationship: '', age: '' };
+                              list[idx].relationship = e.target.value;
+                              setFormState(prev => ({ ...prev, familyMembersList: list }));
+                              setFormErrors(prev => ({ ...prev, familyMembersList: '' }));
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[9px] uppercase tracking-wider font-bold text-brand-black/40">Age (Optional)</label>
+                          <input 
+                            type="text" 
+                            className="w-full bg-brand-white border border-brand-black/10 rounded-xl px-4 py-2.5 text-xs focus:ring-1 focus:ring-brand-black outline-none"
+                            placeholder="Age"
+                            value={formState.familyMembersList[idx]?.age || ''}
+                            onChange={(e) => {
+                              const list = [...formState.familyMembersList];
+                              if (!list[idx]) list[idx] = { name: '', relationship: '', age: '' };
+                              list[idx].age = e.target.value;
+                              setFormState(prev => ({ ...prev, familyMembersList: list }));
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* SECTION 4: Past Residence & Pets */}
+            <div className="space-y-6 pt-6 border-t border-brand-black/10">
+              <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-brand-black/60 pb-2 border-b border-brand-black/10 flex items-center">
+                <MapPinned className="w-4 h-4 mr-2" /> 4. Previous Residence & Household Details
+              </h3>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                    Previous Residence Address
+                  </label>
+                  <textarea 
+                    value={formState.prevAddress}
+                    onChange={(e) => handleInputChange('prevAddress', e.target.value)}
+                    className="w-full bg-brand-white border-2 border-transparent rounded-2xl px-5 py-4 h-24 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm resize-none"
+                    placeholder="Where were you renting before?"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                    Reason for Leaving Previous Residence
+                  </label>
+                  <textarea 
+                    value={formState.prevReason}
+                    onChange={(e) => handleInputChange('prevReason', e.target.value)}
+                    className="w-full bg-brand-white border-2 border-transparent rounded-2xl px-5 py-4 h-24 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm resize-none"
+                    placeholder="Why are you moving out?"
+                  />
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50 block">
+                    Will you keep any pets? *
+                  </label>
+                  <div className="flex space-x-6 py-2">
+                    <label className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-brand-black/60 cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="pets" 
+                        value="Yes" 
+                        checked={formState.pets === 'Yes'}
+                        onChange={(e) => handleInputChange('pets', 'Yes')}
+                        className="w-4 h-4 accent-brand-black"
+                      />
+                      <span>Yes</span>
+                    </label>
+                    <label className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-brand-black/60 cursor-pointer">
+                      <input 
+                        type="radio" 
+                        name="pets" 
+                        value="No" 
+                        checked={formState.pets === 'No'}
+                        onChange={(e) => handleInputChange('pets', 'No')}
+                        className="w-4 h-4 accent-brand-black"
+                      />
+                      <span>No</span>
+                    </label>
+                  </div>
+                </div>
+
+                {formState.pets === 'Yes' && (
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                      Specify Pets (Type & Quantity)
+                    </label>
+                    <input 
+                      type="text" 
+                      value={formState.petsDetails}
+                      onChange={(e) => handleInputChange('petsDetails', e.target.value)}
+                      className="w-full bg-brand-white border-2 border-transparent rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm"
+                      placeholder="e.g. 1 small cat"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* SECTION 5: Expected Move-in & Emergency Contact */}
+            <div className="space-y-6 pt-6 border-t border-brand-black/10">
+              <h3 className="text-sm font-bold uppercase tracking-[0.2em] text-brand-black/60 pb-2 border-b border-brand-black/10 flex items-center">
+                <Calendar className="w-4 h-4 mr-2" /> 5. Expected Move & Emergency Contacts
+              </h3>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                    Expected Move-in Date *
+                  </label>
+                  <input 
+                    type="date" 
+                    value={formState.moveInDate}
+                    onChange={(e) => handleInputChange('moveInDate', e.target.value)}
+                    className={`w-full bg-brand-white border-2 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.moveInDate ? 'border-red-400' : 'border-transparent'}`}
+                  />
+                  {formErrors.moveInDate && (
+                    <p className="text-[10px] text-red-500 font-medium ml-1">{formErrors.moveInDate}</p>
                   )}
-                </AnimatePresence>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                    Emergency Contact Name *
+                  </label>
+                  <input 
+                    type="text" 
+                    value={formState.emergencyName}
+                    onChange={(e) => handleInputChange('emergencyName', e.target.value)}
+                    className={`w-full bg-brand-white border-2 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.emergencyName ? 'border-red-400' : 'border-transparent'}`}
+                    placeholder="Full Name"
+                  />
+                  {formErrors.emergencyName && (
+                    <p className="text-[10px] text-red-500 font-medium ml-1">{formErrors.emergencyName}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                    Emergency Contact Relationship *
+                  </label>
+                  <input 
+                    type="text" 
+                    value={formState.emergencyRelationship}
+                    onChange={(e) => handleInputChange('emergencyRelationship', e.target.value)}
+                    className={`w-full bg-brand-white border-2 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.emergencyRelationship ? 'border-red-400' : 'border-transparent'}`}
+                    placeholder="e.g. Brother / Father / Sister"
+                  />
+                  {formErrors.emergencyRelationship && (
+                    <p className="text-[10px] text-red-500 font-medium ml-1">{formErrors.emergencyRelationship}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest font-bold text-brand-black/50">
+                    Emergency Contact Number *
+                  </label>
+                  <input 
+                    type="text" 
+                    value={formState.emergencyPhone}
+                    onChange={(e) => handleInputChange('emergencyPhone', e.target.value)}
+                    className={`w-full bg-brand-white border-2 rounded-2xl px-5 py-4 focus:ring-2 focus:ring-brand-black/5 outline-none transition-all shadow-sm ${formErrors.emergencyPhone ? 'border-red-400' : 'border-transparent'}`}
+                    placeholder="Contact Number"
+                  />
+                  {formErrors.emergencyPhone && (
+                    <p className="text-[10px] text-red-500 font-medium ml-1">{formErrors.emergencyPhone}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* SECTION 6: Legal Declarations & Agreements */}
+            <div className="space-y-6 pt-6 border-t border-brand-black/10">
+              <div className="bg-brand-gray/50 border border-brand-black/5 p-6 rounded-3xl space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-widest text-brand-black">Disclaimers & Screening Consent Statement</h3>
+                <p className="text-[11px] leading-relaxed text-brand-black/60 italic">
+                  "This application form is for information and screening purposes only and does not create any tenancy rights or contractual obligations. The landlord reserves the unrestricted right to decline any application without assigning any reason and shall not be bound to offer or enter into a tenancy agreement with the applicant"
+                </p>
+                
+                <div className="pt-2">
+                  <label className="flex items-start space-x-3 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      className="mt-1 w-4 h-4 accent-brand-black rounded border-brand-black/20 focus:ring-0 focus:ring-offset-0"
+                      checked={formState.agreeConsent}
+                      onChange={(e) => handleInputChange('agreeConsent', e.target.checked)}
+                    />
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-brand-black/70">
+                      I agree *
+                    </span>
+                  </label>
+                  {formErrors.agreeConsent && (
+                    <p className="text-[10px] text-red-500 font-medium mt-1 pl-1">{formErrors.agreeConsent}</p>
+                  )}
+                </div>
               </div>
             </div>
 

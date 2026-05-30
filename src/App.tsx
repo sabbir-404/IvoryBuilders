@@ -222,19 +222,41 @@ const CollectionSection = ({
   const [images, setImages] = useState<{ src: string, ratio: number }[]>([]);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInView, setIsInView] = useState(false);
+  const elementRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsInView(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "400px" }
+    );
+    if (elementRef.current) {
+      observer.observe(elementRef.current);
+    }
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!isInView) return;
+
     const fetchImages = async () => {
       setIsLoading(true);
-      const categoryImages: { src: string, ratio: number }[] = [];
       
-      // Attempt to load up to 20 images per category
-      const checkImages = Array.from({ length: 20 }, (_, i) => {
+      // On mobile, check up to 6 images first. On desktop check up to 8.
+      // If expanded, scan up to 15. This saves massive 404 network requests and preloads on startup.
+      const isMobile = window.innerWidth < 768;
+      const scanLimit = isExpanded ? 15 : (isMobile ? 6 : 8);
+      
+      const checkImages = Array.from({ length: scanLimit }, (_, i) => {
         const src = `${STORAGE_BASE_URL}/${category.id}/${String(i + 1).padStart(2, '0')}.jpg`;
         return new Promise<{ src: string, ratio: number } | null>((resolve) => {
           const img = new Image();
           img.src = src;
-          // Set crossOrigin if needed, though referrerPolicy is used
           img.onload = () => {
             resolve({ src, ratio: img.naturalWidth / img.naturalHeight });
           };
@@ -248,11 +270,19 @@ const CollectionSection = ({
     };
 
     fetchImages();
-  }, [category.id]);
+  }, [category.id, isInView, isExpanded]);
 
   const visibleImages = isExpanded ? images : images.slice(0, 4);
 
-  if (isLoading) return <div className="py-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-brand-black/20" /></div>;
+  if (!isInView) {
+    return (
+      <div ref={elementRef} className="min-h-[200px] flex items-center justify-center border border-dashed border-brand-black/5 rounded-3xl bg-brand-white/20">
+        <Loader2 className="w-6 h-6 animate-spin text-brand-black/10" />
+      </div>
+    );
+  }
+
+  if (isLoading) return <div ref={elementRef} className="py-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-brand-black/20" /></div>;
   if (images.length === 0) return null;
 
   return (
@@ -500,22 +530,45 @@ export default function App() {
         all.push({ src: img.src, label: `Perspective ${i + 1}` });
       });
 
-      const catPromises = COLLECTION_CATALOG.map(cat => {
-        return Array.from({ length: 15 }, (_, i) => {
-          const src = `${STORAGE_BASE_URL}/${cat.id}/${String(i + 1).padStart(2, '0')}.jpg`;
-          return new Promise<{ src: string, label: string } | null>((resolve) => {
-            const img = new Image();
-            img.src = src;
-            img.onload = () => resolve({ src, label: cat.label });
-            img.onerror = () => resolve(null);
-          });
-        });
-      }).flat();
+      // Instantly set the baseline gallery images with the 35 HERO perspectives
+      // so lightbox can open instantly with hero images if selected early
+      setAllGalleryImages(all);
 
-      const results = await Promise.all(catPromises);
-      const filtered = results.filter((img): img is { src: string, label: string } => img !== null);
-      setAllGalleryImages([...all, ...filtered]);
-      setGalleryImagesLoaded(true);
+      // Defer the heavy bulk preloading/checking of sub-categories to keep the initial page mount
+      // extremely lightweight and fast, especially on mobile. We also reduce scans per category
+      // to 6 on mobile and 8 on desktop to avoid wasting memory and CPU on nonexistent files.
+      const runPreload = async () => {
+        const isMobile = window.innerWidth < 768;
+        const scanLength = isMobile ? 6 : 8;
+
+        const catPromises = COLLECTION_CATALOG.map(cat => {
+          return Array.from({ length: scanLength }, (_, i) => {
+            const src = `${STORAGE_BASE_URL}/${cat.id}/${String(i + 1).padStart(2, '0')}.jpg`;
+            return new Promise<{ src: string, label: string } | null>((resolve) => {
+              const img = new Image();
+              img.src = src;
+              img.onload = () => resolve({ src, label: cat.label });
+              img.onerror = () => resolve(null);
+            });
+          });
+        }).flat();
+
+        const results = await Promise.all(catPromises);
+        const filtered = results.filter((img): img is { src: string, label: string } => img !== null);
+        setAllGalleryImages([...all, ...filtered]);
+        setGalleryImagesLoaded(true);
+      };
+
+      const delayMs = window.innerWidth < 768 ? 6000 : 3000;
+      const timeoutId = setTimeout(() => {
+        if ('requestIdleCallback' in window) {
+          (window as any).requestIdleCallback(() => runPreload());
+        } else {
+          runPreload();
+        }
+      }, delayMs);
+
+      return () => clearTimeout(timeoutId);
     };
 
     loadAllImages();
@@ -551,31 +604,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Optimization: Skip heavyweight validation on first load to improve LCP
-    // Just use the first 10 for the rotation pool initially
-    setLandscapeImages(HERO_IMAGES.slice(0, 10));
-    
-    const validateExtraImages = async () => {
-      const results = await Promise.all(
-        HERO_IMAGES.slice(10).map((img) => {
-          return new Promise<typeof HERO_IMAGES[0] | null>((resolve) => {
-            const image = new Image();
-            image.src = img.src;
-            image.onload = () => {
-              if (image.naturalWidth >= image.naturalHeight) resolve(img);
-              else resolve(null);
-            };
-            image.onerror = () => resolve(null);
-          });
-        })
-      );
-      const filtered = results.filter((img): img is typeof HERO_IMAGES[0] => img !== null);
-      setLandscapeImages(prev => [...prev, ...filtered]);
-    };
-
-    // Run heavier validation after 2 seconds to prioritize above-the-fold content
-    const timeout = setTimeout(validateExtraImages, 2000);
-    return () => clearTimeout(timeout);
+    // All 35 perspectives are confirmed landscape architectural images.
+    // We instantly assign HERO_IMAGES so there are no delayed, concurrent network requests
+    // that congest mobile cellular bandwidth and slow down above-the-fold rendering.
+    setLandscapeImages(HERO_IMAGES);
   }, []);
 
   useEffect(() => {

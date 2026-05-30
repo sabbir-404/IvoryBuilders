@@ -87,7 +87,7 @@ const LANDMARKS = [
     distKm: "2.1 km", 
     category: "Mall", 
     icon: <ShoppingBag className="w-5 h-5" />, 
-    image: "https://lh3.googleusercontent.com/gps-cs-s/APNQkAET2dpTFQxTYGU70x_6MTOj3filxyItA9Ek0rGdSeSl9bE62QH8GZJ9vRiQ5zm673D8M9_c3vXVs2zoqYGcdqMXH1GBlvCXoaqcDLYEc4t_JWPABw8zzjmnXv7AxXC3J0h0BIpvpGVv6UzB=s1360-w1360-h1020-rw",
+    image: "https://www.thedailystar.net/sites/default/files/styles/big_1/public/images/2024/11/23/jamuna_future_park.jpg",
     link: "https://maps.google.com/?q=Jamuna+Future+Park",
     usp: "Asia's largest shopping mall and entertainment hub."
   },
@@ -137,7 +137,7 @@ const LANDMARKS = [
     category: "Supermarket", 
     distKm: "0.2 km", 
     icon: <ShoppingBag className="w-5 h-5" />, 
-    image: "https://lh3.googleusercontent.com/gps-cs-s/APNQkAEGcIMlorew6fPFuViA0M83C-kNH0nG0fAGJj47R4s0_TFOaCJLg7t0HYLzQA-nmSrRHMJso3NrKLvsluEVZN99onDVZhjChLcIx2C1qE6FXSqoHDDZk2cEMNjhr_VGgY2LauX0qPHHKw8q=w408-h306-k-no",
+    image: "https://gracengear.com/wp-content/uploads/2025/10/00.png",
     link: "https://maps.app.goo.gl/x1x8DKTVwuinwgpTA",
     usp: "Daily essentials and premium grocery just steps away."
   },
@@ -193,6 +193,7 @@ const RESIDENCE_FEATURES = [
 ];
 
 const COLLECTION_CATALOG = [
+  { id: 'outside', label: 'Entry Space' },
   { id: 'Master_Bedroom', label: 'Master Bedroom' },
   { id: '2nd_Bedroom', label: '2nd Bedroom' },
   { id: '3rd_bedroom', label: '3rd Bedroom' },
